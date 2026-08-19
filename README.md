@@ -1,35 +1,35 @@
-# 司器（SIQI）
+# SIQI
 
-司器是一款面向 Android 的端侧优先 AI 工作站。会话、配置、API 密钥、模型记录、工作区信息、权限审计、工作日志和缓存索引均保存在本机；联网只用于用户明确配置的 API、模型下载、MCP 目录同步、GitHub 导入和官方资源访问。
+SIQI is a local-first AI workstation for Android. Conversations, settings, API credentials, model records, workspace metadata, permission audits, work logs, and cache indexes stay on the device. Network access is used only for user-configured APIs, model downloads, MCP catalog sync, GitHub import, and explicit access to official resources.
 
-应用 ID：`com.psq.siqi`  
-最低版本：Android 10（API 29）  
-当前目标版本：Android 16（API 36）  
-Flutter：stable 3.38.0 或更高兼容版本  
-源代码许可：MIT License
+Application ID: `com.psq.siqi`  
+Minimum OS: Android 10 (API 29)  
+Current target: Android 16 (API 36)  
+Flutter: stable 3.38.0 or a compatible newer release  
+Source license: MIT License
 
-> MIT 许可允许个人及商业使用。模型、MCP 服务、Harness 运行包和其他第三方资源仍分别受其自身许可证与服务条款约束。
+> The MIT license permits personal and commercial use. Models, MCP services, Harness runtimes, and other third-party resources remain subject to their own licenses and terms.
 
-## 当前实现
+## Implemented features
 
-### 对话工作台
+### Conversation workbench
 
-- Chat：标准问答、会话历史、本地搜索、流式响应、附件能力检测。
-- Agent：面向本地工作区的自主编程流程，先展示计划和动作，再由用户批准写入或执行。
-- Harness：仅接受已测试的 DeepSeek API 配置，提供审查、静态检查和测试建议。
-- MCP：管理 HTTP、SSE 与开发者 stdio 服务，执行连接测试并读取工具列表。
-- AI 团队：最多选择 8 个已测试的 API 配置，多轮共享前序输出，由协调成员生成最终汇总。
-- 纯文本模型会禁用图片、PDF 和音频附件入口；多模态能力由模型配置显式声明。
+- Chat: standard conversations, local history, search, streaming responses, and attachment capability checks.
+- Agent: autonomous programming workflows within a selected local workspace. Plans and actions are shown before writes or execution.
+- Harness: accepts tested DeepSeek API profiles only and provides review, static-analysis, and test guidance.
+- MCP: manages HTTP, SSE, and developer-only stdio servers, tests connections, and lists discovered tools.
+- AI team: coordinates up to eight tested API profiles. Members share previous outputs over multiple rounds, then a coordinator produces one synthesis.
+- Text-only models disable image, PDF, and audio attachment actions. Multimodal capability is declared explicitly by each profile.
 
-内置系统提示词强调本地优先、证据验证、工作区边界、最小修改、非破坏性操作和远程数据边界。用户仍可在设置中编辑提示词，并使用 `{user_name}`、`{current_time}` 变量。
+The built-in system prompt prioritizes local processing, evidence, workspace boundaries, minimal coherent changes, non-destructive behavior, and clear remote-data boundaries. It remains editable and supports `{user_name}` and `{current_time}`.
 
-### 端侧模型
+### On-device models
 
-应用集成 `llama.cpp` FFI，通过独立 Isolate 加载 GGUF 和执行推理。Release APK 内直接包含 arm64 原生库，不依赖占位桥或远程推理服务。
+The APK embeds a real `llama.cpp` FFI runtime. GGUF loading and generation run through a worker Isolate, without a placeholder native bridge or remote inference dependency.
 
-模型市场只列出以下 Q4_K_M 包；每项都有固定下载地址、文件大小、来源页面和 SHA-256。下载支持断点续传，安装前必须校验散列值。
+The market contains only the following Q4_K_M packages. Every entry has a fixed download URL, byte size, source page, and SHA-256. Downloads resume from partial files and must pass hashing before installation.
 
-| 模型 | 大小 | 最低建议内存 | 来源 |
+| Model | Size | Suggested minimum RAM | Source |
 |---|---:|---:|---|
 | Hunyuan-0.5B | 0.35 GB | 2 GB | ModelScope / bartowski |
 | Hunyuan-1.8B | 1.13 GB | 4 GB | ModelScope / bartowski |
@@ -42,185 +42,185 @@ Flutter：stable 3.38.0 或更高兼容版本
 | Qwen3.5-4B | 2.74 GB | 7 GB | ModelScope / Unsloth |
 | Qwen3.5-9B | 5.68 GB | 12 GB | ModelScope / Unsloth |
 
-模型卡片显示许可证。腾讯混元包受腾讯混元社区许可约束；Qwen 与 Gemma 条目按各自模型卡展示的许可证执行。下载源变更或散列值不一致时，应用不会安装文件。
+Model cards disclose licenses. Hunyuan packages are subject to the Tencent Hunyuan Community License; Qwen and Gemma entries follow the licenses shown on their respective model cards. A changed source or checksum mismatch prevents installation.
 
-### 模型下载与完整性
+### Download and integrity workflow
 
-1. 打开“实验室 → 模型市场”。
-2. 查看模型大小、最低内存、许可证和官方来源。
-3. 点击下载。通知权限只在需要显示下载进度时申请；拒绝后下载仍可继续。
-4. 暂停后再次点击可从 `.part` 文件续传。
-5. 下载完成后应用计算 SHA-256；不匹配的临时文件会被删除并写入工作日志。
-6. 已安装文件按路径、大小和修改时间缓存校验结果，界面刷新不会反复扫描整个 GGUF。
+1. Open **Lab → Model market**.
+2. Review size, minimum memory, license, and official source.
+3. Start the download. Notification permission is requested only for progress notifications; denial does not stop the download.
+4. Pause and resume from the `.part` file as needed.
+5. SIQI calculates SHA-256 before renaming the completed file. A mismatched partial file is removed and logged.
+6. Installed-file checks are cached by path, size, and modification time, avoiding repeated full GGUF scans during UI rebuilds.
 
-### MCP 商店与管理
+### MCP store and management
 
-“实验室 → MCP 商店”读取 ModelScope 的公开 MCP 目录，支持：
+**Lab → MCP store** reads the public ModelScope MCP catalog and provides:
 
-- 分页同步、SQLite 本地缓存和离线搜索；
-- 按名称、作者或说明过滤；
-- 打开官方详情；
-- 对具有公开 HTTP/SSE 托管端点的条目一键导入管理器；
-- 导入后先测试连接，再查看服务公开的工具列表；
-- 同步和导入操作写入本地工作日志。
+- paginated sync, SQLite caching, and offline search;
+- filtering by name, author, or description;
+- links to official details;
+- one-tap import for entries exposing a public HTTP/SSE hosted endpoint;
+- connection testing and tool discovery after import;
+- local work logs for sync and import operations.
 
-ModelScope 可能要求浏览器完成 WAF 安全验证。应用会验证响应确实是 JSON；若收到挑战页面，不会把 HTML 当成插件数据，也不会清空已有缓存。此时可从右上角打开官方目录。
+ModelScope may require a browser WAF security check. SIQI validates that the response is JSON. It never stores challenge HTML as catalog data and never erases a previous cache after such a response. The toolbar can open the official catalog when browser verification is necessary.
 
-普通用户只能配置 URL 型 MCP。stdio 与命令型 MCP 仅在开启开发者模式后显示，下载或导入的第三方内容不会被静默执行。
+Regular users can configure URL-based MCP services only. stdio and command-based MCP settings appear only after Developer mode is enabled. Downloaded or imported third-party content never runs silently.
 
 ### DeepSeek Harness
 
-- Harness 模式只使用 DeepSeek API 配置。
-- API 配置必须先通过连接测试。
-- 可验证并下载官方 npm 运行包。
-- 可同步并管理指定插件目录中的插件归档。
-- 官方运行环境要求 Node.js，Android APK 不会伪装内嵌一个不完整运行时；可连接由 Termux 或同一局域网电脑启动的兼容服务。
-- 插件只下载和校验，不会自动执行。
+- Harness mode uses DeepSeek API profiles only.
+- A profile must pass a connection test first.
+- SIQI can verify and download the official npm runtime package.
+- It can synchronize and manage plugin source archives from the configured catalog.
+- The official runtime requires Node.js. The APK does not pretend to embed an incomplete runtime; it can connect to a compatible service started in Termux or on a LAN computer.
+- Plugins are downloaded and verified, never auto-executed.
 
-### 多模态专区
+### Multimodal zone
 
-专区读取设备总内存和当前可用内存，以总内存的 60% 作为模型加任务的硬上限，并据剩余内存估算单次音频建议时长。
+The zone reads total and available device memory. Model plus task peak memory is hard-limited to 60% of total RAM, and remaining memory determines the suggested single-audio duration.
 
-截至当前核验：
+Current verified official packages are:
 
-- 官方 MiMo-V2.5-ASR 权重约 32.07 GB；
-- MiMo-Audio-7B-Instruct 加 Audio Tokenizer 约 23.85 GB；
-- 官方尚未提供经过验证、可在本项目 Android 运行时上执行的小型量化 TTS/ASR 包。
+- MiMo-V2.5-ASR: approximately 32.07 GB of weights;
+- MiMo-Audio-7B-Instruct plus Audio Tokenizer: approximately 23.85 GB;
+- no verified small quantized TTS/ASR package currently runs on this project’s Android runtime.
 
-因此 24 GB 及以下内存设备会显示不兼容并禁止下载。专区保留官方来源链接；只有同时满足真实下载源、Android 运行时可用和 60% 峰值限制后才会开放下载，绝不展示虚假的“可用模型”。
+A roughly 24 GB or lower device therefore shows these packages as incompatible and blocks downloading. Official source links remain visible. Download becomes available only when a package has a real source, a working Android runtime, and a verified peak below the 60% limit.
 
-### 工作区与项目文件
+### Workspaces and project files
 
-首次引导可选择工作区。默认建议位置为：
+Onboarding can select a workspace. The suggested project location is:
 
 `/storage/emulated/0/Siqi/Projects`
 
-Android 11 及以上使用系统目录选择器和 Scoped Storage。应用不会申请 Root，也不会申请“管理所有文件”权限。若系统未授予建议目录，用户可选择其他目录，拒绝不会阻止应用启动。
+Android 11 and later use the system directory picker and Scoped Storage. SIQI requests neither Root nor all-files access. If the suggested directory is unavailable, the user can choose another directory or deny access without preventing startup.
 
-Agent 文件操作执行以下约束：
+Agent file operations enforce:
 
-- 读取、写入、建目录和索引必须位于当前工作区；
-- 拒绝 `..` 路径穿越和越界解析路径；
-- 写入前展示动作、目标和原因；
-- 默认要求用户确认修改；
-- 不宣称未实际执行的命令、修改或测试结果。
+- reads, writes, directory creation, and indexing inside the active workspace;
+- rejection of `..` traversal and resolved paths outside that boundary;
+- visible actions, targets, and reasons before writes;
+- confirmation for modifications by default;
+- no claim that an unexecuted change or test succeeded.
 
-生成项目的建议下载位置可在“设置 → 数据与存储”中查看和修改。
+The suggested generated-project location can be changed under **Settings → Data and storage**.
 
-### 开发者 Shell
+### Developer Shell
 
-普通用户界面不显示 Shell，也不要求输入任何命令。开启“设置 → 开发者模式”后，实验室才会出现完整 Shell 队列。
+Regular users never see the Shell and are never asked to type commands. After **Settings → Developer mode** is enabled, a complete Shell queue appears in Lab.
 
-Shell 具备命令历史、消息队列、工作目录、超时、输出截断和工作日志。执行使用 Android 的 Linux 用户空间：
+It provides command history, a queue, working-directory handling, timeouts, output limits, and work logs. Execution uses Android’s Linux user space:
 
-- 系统 Shell：`sh -c`；
-- 可选 Termux 或 Shizuku 环境；
-- 禁止 `su`、`sudo`、Magisk、提权和系统分区写入；
-- 高危命令需要二次确认；
-- 单任务默认两分钟超时；
-- 标准输出和错误输出按 UTF-8 记录，单项最多保留 1 MiB。
+- system `sh -c`;
+- optional Termux or Shizuku environments;
+- `su`, `sudo`, Magisk, privilege escalation, and system-partition writes are blocked;
+- dangerous commands require a second confirmation;
+- each task has a two-minute default timeout;
+- stdout and stderr are decoded as UTF-8 and capped at 1 MiB each.
 
-应用不申请 Root 权限。Android 底层基于 Linux，但应用仍受 UID 沙箱、SELinux 和 Scoped Storage 约束。
+SIQI never requests Root. Android is Linux-based, but the app remains constrained by its UID sandbox, SELinux, and Scoped Storage.
 
-### 权限与隐私
+### Permissions and privacy
 
-权限在对应功能首次使用时申请，不在启动时批量索取。拒绝任何权限都不会导致启动失败。
+Permissions are requested when their corresponding feature is first used, never as a startup bundle. Denial does not crash or block the application.
 
-“设置 → 权限与隐私”会列出：
+**Settings → Permissions and privacy** shows:
 
-- 权限名称；
-- 触发功能；
-- 申请理由；
-- 请求时间与结果；
-- 用户可清除的本地审计记录。
+- permission name;
+- triggering feature;
+- detailed purpose;
+- request time and result;
+- locally stored audit entries that the user can delete.
 
-可能使用的权限包括通知、麦克风、相机和用户选择的媒体文件。工作区与模型目录通过系统选择器授权。应用不申请 Root 和所有文件访问权。
+Potential permissions include notifications, microphone, camera, and user-selected media. Workspaces and model directories use system pickers. Root and all-files access are never requested.
 
-### 工作日志与缓存
+### Work logs and cache
 
-“设置 → 日志与缓存”支持：
+**Settings → Logs and cache** can:
 
-- 查看模型下载、权限、Shell、MCP、Harness、Agent 和团队任务日志；
-- 清除工作日志；
-- 统计应用缓存；
-- 删除可再生成的缓存，不删除会话、API 配置或已安装模型。
+- show model, permission, Shell, MCP, Harness, Agent, and AI-team logs;
+- clear work logs;
+- calculate app cache size;
+- remove reproducible caches without deleting conversations, API profiles, or installed models.
 
-## 用户使用流程
+## User guide
 
-### 首次启动
+### First launch
 
-1. 阅读 MIT 许可、隐私边界和独立项目声明。
-2. 设置昵称。
-3. 选择浅色、深色或跟随系统。
-4. 选择工作区，或暂时跳过。
-5. 进入主界面后按实际功能申请权限。
+1. Read the MIT license, privacy boundary, and independent-project notice.
+2. Choose a display name.
+3. Select light, dark, or system theme.
+4. Select a workspace or skip it.
+5. Grant permissions only when a feature actually needs them.
 
-界面遵循 Material 3 和原生 Android 导航、颜色、触控目标、返回行为与系统动效。所有表面统一使用 12 px 圆角，不包含自定义背景或强制高刷新率逻辑。
+The interface follows Material 3 and native Android navigation, colors, touch targets, back behavior, and system motion. Surfaces use a consistent 12 px radius. There are no custom backgrounds, liquid-glass effects, elaborate motion mode, or forced high-refresh behavior.
 
-### 配置远程 API
+### Configure a remote API
 
-1. 打开“设置 → API 配置”。
-2. 选择厂商模板或兼容格式。
-3. 填写名称、Base URL、模型 ID、API Key 和可选 Headers。
-4. 标记模型是否支持多模态。
-5. 点击“测试连接”。未测试的配置不能用于对话。
+1. Open **Settings → API profiles**.
+2. Pick a vendor template or a compatible format.
+3. Enter a name, Base URL, model ID, API key, and optional headers.
+4. Declare whether the model supports multimodal input.
+5. Run **Test connection**. Untested profiles cannot send conversations.
 
-API Key 存入 Android 加密存储，数据库只保存非密钥配置。远程请求只发往用户明确填写的站点。
+API keys use Android encrypted storage; SQLite stores only non-secret profile data. Requests go only to the endpoint explicitly configured by the user.
 
-### 使用 AI 团队
+### Use an AI team
 
-1. 至少创建两个已测试的 API 配置。
-2. 打开“实验室 → AI 团队”。
-3. 新建团队并选择最多 8 个成员。
-4. 设置 1–4 轮协作。
-5. 输入任务并启动。
-6. 成员依次读取任务和前序结果，最后由协调成员汇总。
-7. 可随时停止或删除本地团队记录。
+1. Create at least two tested API profiles.
+2. Open **Lab → AI team**.
+3. Create a team with up to eight members.
+4. Choose one to four collaboration rounds.
+5. Enter the task and start.
+6. Each member reads the task and previous outputs; the coordinator produces the synthesis.
+7. Stop at any time or delete the local collaboration history.
 
-## 本地数据
+## Local data layout
 
-- `shared_preferences`：轻量设置；
-- `sqflite`：会话、消息、API 配置、模型记录、MCP、权限审计、工作日志和团队记录；
-- `flutter_secure_storage`：API Key 等敏感凭据；
-- 应用支持目录：默认模型与可再生成缓存；
-- 用户授权目录：工作区和导出文件。
+- `shared_preferences`: lightweight settings;
+- `sqflite`: conversations, messages, profiles, model records, MCP, permission audits, work logs, and teams;
+- `flutter_secure_storage`: API keys and other credentials;
+- app support directory: default model and reproducible cache storage;
+- user-authorized directories: workspace and exported files.
 
-导出 `.siqi` 包可包含会话与代码文件；配置导出为 `.siji_config`，API Key 永远脱敏。导入前应确认文件来源。
+A `.siqi` export can contain sessions and code files. `.siji_config` configuration exports always redact API keys. Import only files from trusted sources.
 
-## 在 Windows PC 配置 Flutter
+## Windows Flutter setup
 
-### 1. 安装依赖
+### 1. Install dependencies
 
-安装以下软件：
+Install:
 
-- Git for Windows；
-- Flutter stable 3.38.0 或兼容更新版；
-- Android Studio；
-- Android SDK Platform 36；
-- Android SDK Build-Tools 36；
-- Android SDK Command-line Tools；
-- Android NDK `29.0.14206865`；
-- CMake 3.22.1；
-- JDK 17（可使用 Android Studio 内置 JBR）。
+- Git for Windows;
+- Flutter stable 3.38.0 or a compatible newer version;
+- Android Studio;
+- Android SDK Platform 36;
+- Android SDK Build-Tools 36;
+- Android SDK Command-line Tools;
+- Android NDK `29.0.14206865`;
+- CMake 3.22.1;
+- JDK 17, including Android Studio’s bundled JBR.
 
-把 Flutter 的 `bin` 加入 PATH 后，在 PowerShell 运行：
+Add Flutter `bin` to PATH, then run:
 
 ```powershell
 flutter doctor -v
 flutter doctor --android-licenses
 ```
 
-确保 Android toolchain 和 Android Studio 均通过检查。
+Make sure Android toolchain and Android Studio checks pass.
 
-### 2. 打开工程
+### 2. Open the project
 
-1. Android Studio 选择 **Open**，打开仓库根目录，不要只打开 `android/`。
-2. 安装 Flutter 与 Dart 插件。
-3. 等待 `pub get` 和 Gradle Sync 完成。
-4. 运行 `flutter gen-l10n`。
-5. 运行 `flutter analyze`，确认无问题。
+1. In Android Studio, choose **Open** and select the repository root, not only `android/`.
+2. Install the Flutter and Dart plugins.
+3. Wait for `pub get` and Gradle Sync.
+4. Run `flutter gen-l10n`.
+5. Run `flutter analyze` and resolve every issue.
 
-如果用户名、OneDrive 或工程路径含中文导致 CMake/Ninja 异常，可为工程、Flutter 和 Pub Cache 创建纯 ASCII 入口。本项目验证环境使用：
+If a non-ASCII Windows user name, OneDrive, or a long project path breaks CMake/Ninja, create ASCII path entries for the project, Flutter, SDK, and Pub Cache. The verified environment uses:
 
 ```text
 C:\Users\Public\siqi-build-workspace
@@ -229,23 +229,23 @@ C:\Users\Public\siqi-pub-cache
 C:\Users\Public\android-sdk
 ```
 
-ASCII 入口可以是目录联接，不需要移动或删除原工程。
+These can be directory junctions; the original project does not need to be moved or deleted.
 
-### 3. USB 真机调试
+### 3. USB debugging
 
-1. 在手机开启开发者选项与 USB 调试。
-2. USB 连接后在手机上确认调试指纹。
-3. 在 PowerShell 运行 `flutter devices`。
-4. Android Studio 顶部选择真机，点击 Run 调试。
-5. 性能问题使用 Profile，而不是用 Debug 帧率判断：
+1. Enable Developer options and USB debugging on the phone.
+2. Connect USB and approve the computer fingerprint.
+3. Run `flutter devices`.
+4. Select the phone in Android Studio and press Run.
+5. Use Profile, rather than Debug frame rate, for performance checks:
 
 ```powershell
 flutter run --profile -d <device-id>
 ```
 
-### 4. 构建 APK
+### 4. Build an APK
 
-本地 arm64 Release：
+Build a local arm64 Release APK:
 
 ```powershell
 flutter clean
@@ -255,39 +255,39 @@ flutter analyze
 flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
-输出文件：
+Output:
 
 `build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
 
-覆盖安装且保留数据：
+Install over the existing app without clearing data:
 
 ```powershell
 adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 ```
 
-发布前应在 `android/key.properties` 配置独立签名。没有发布密钥时，工程只为本地验证回退到 debug 签名，不能作为正式商店包。
+Configure an independent release key in `android/key.properties` before distribution. Without one, the project falls back to debug signing for local Release verification only and is not a store-ready package.
 
-## 已验证基线
+## Verified baseline
 
-- `flutter analyze`：0 问题；
-- Android 14-17 / arm64 / 小米10-17系列、：Release 覆盖安装成功；
-- Release 版本号：`1.0.0 (2001)`；
-- 冷启动 Activity 返回成功，进程持续存活；
-- APK 内包含 `libllama_cpp.so` 和 `libomp.so`；
-- 未发现 Flutter/Dart 崩溃；
-- 安全锁屏状态下无法自动完成可视化页面巡检，需用户解锁后继续交互测试。
+- `flutter analyze`: zero issues;
+- Android 14-17 / arm64 Xiaomi 10-17 Series: Release upgrade installation succeeded;
+- Release version: `1.0.0 (2001)`;
+- cold-start Activity completed and the process remained alive;
+- APK contains `libllama_cpp.so` and `libomp.so`;
+- no Flutter or Dart crash was observed;
+- secure lock screen prevented automated visual page traversal; unlock the phone before continued interaction testing.
 
-## 安全与限制
+## Safety and limitations
 
-- 不绕过设备锁屏、系统沙箱、SELinux 或 Scoped Storage。
-- 不执行下载的 MCP/Harness 插件，除非开发者明确配置并启动。
-- 不提供未验证的模型下载项。
-- 不隐藏远程请求目的地。
-- Agent 和 Shell 可能修改本地文件，使用前请备份重要工作区。
-- GitHub OAuth、厂商 API、MCP 与模型镜像的可用性由对应服务控制。
+- SIQI does not bypass the device lock screen, sandbox, SELinux, or Scoped Storage.
+- Downloaded MCP or Harness content does not execute unless a developer explicitly configures and starts it.
+- The market does not show unverified model downloads.
+- Remote destinations are never concealed.
+- Agent and Shell features can modify local files; back up important workspaces.
+- GitHub OAuth, vendor APIs, MCP services, and mirrors remain subject to their providers’ availability.
 
-## 许可证与项目
+## License and project
 
-- 项目主页：<https://github.com/psq0421/SIQI>
-- 源代码：MIT License
-- 本项目为独立开源项目，与模型厂商、API 厂商和模型托管平台不存在商业隶属关系。
+- Project: <https://github.com/psq0421/SIQI>
+- Source: MIT License
+- SIQI is an independent open-source project with no commercial affiliation to model vendors, API vendors, or model-hosting platforms.
