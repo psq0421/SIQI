@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="siqi_icon_background">#FFFFFF</color>
+    <color name="siqi_launch_background">#FFFFFF</color>
+    <color name="siqi_launch_background_dark">#111318</color>
+</resources>

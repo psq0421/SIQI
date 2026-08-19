@@ -1,0 +1,57 @@
+name: siqi
+description: A local-first AI workstation for Android.
+publish_to: none
+version: 1.0.0+4003
+
+environment:
+  sdk: '>=3.10.7 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.6.1
+  shared_preferences: ^2.5.3
+  sqflite: ^2.4.2
+  dio: ^5.8.0+1
+  path_provider: ^2.1.5
+  path: ^1.9.1
+  file_picker: ^10.1.9
+  share_plus: ^11.0.0
+  flutter_secure_storage: ^9.2.4
+  flutter_local_notifications: ^19.2.1
+  permission_handler: ^12.0.0+1
+  archive: ^4.0.7
+  llamadart: 0.8.19
+  xml: ^6.5.0
+  crypto: ^3.0.6
+  uuid: ^4.5.1
+  intl: ^0.20.2
+  url_launcher: ^6.3.1
+  mime: ^2.0.0
+  collection: ^1.19.1
+  html: ^0.15.6
+  cross_file: ^0.3.4+2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  build_runner: ^2.4.15
+  riverpod_generator: ^2.6.5
+
+flutter:
+  uses-material-design: true
+  generate: true
+
+hooks:
+  user_defines:
+    llamadart:
+      # SIQI distributes GGUF models only; exclude the unused LiteRT-LM
+      # runtime while retaining llama.cpp CPU and Vulkan backends.
+      llamadart_native_runtimes: [llama_cpp]
+      # Keep the verified b10333 Android runtime in the project so mainland
+      # release builds do not depend on a GitHub download at build time.
+      llamadart_native_path: third_party/llamadart-native
