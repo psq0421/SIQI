@@ -4,8 +4,9 @@ SIQI is a local-first AI workstation for Android. Conversations, settings, API c
 
 Application ID: `com.psq.siqi`  
 Minimum OS: Android 10 (API 29)  
-Current target: Android 16 (API 36)  
-Flutter: stable 3.38.0 or a compatible newer release  
+Current target: Android 17 (API 37)  
+Flutter: stable 3.47.0 or a compatible newer release  
+Current version: `1.0.0-alpha.2+4004`  
 Source license: MIT License
 
 > The MIT license permits personal and commercial use. Models, MCP services, Harness runtimes, and other third-party resources remain subject to their own licenses and terms.
@@ -15,9 +16,9 @@ Source license: MIT License
 ### Conversation workbench
 
 - Chat: standard conversations, local history, search, streaming responses, and attachment capability checks.
-- Agent: autonomous programming workflows within a selected local workspace. Plans and actions are shown before writes or execution.
-- Harness: accepts tested DeepSeek API profiles only and provides review, static-analysis, and test guidance.
-- MCP: manages HTTP, SSE, and developer-only stdio servers, tests connections, and lists discovered tools.
+- Agent: an autonomous programming loop within a selected local workspace. Plans and actions are shown before writes or execution; real results can be reviewed, continued, or undone from per-run snapshots.
+- Harness: accepts only tested DeepSeek API profiles with a stored key and provides review, static-analysis, and test guidance.
+- MCP: defaults to Streamable HTTP, supports legacy HTTP+SSE and developer-only stdio, and provides connection tests, tool discovery, and per-call approval.
 - AI team: coordinates up to eight tested API profiles. Members share previous outputs over multiple rounds, then a coordinator produces one synthesis.
 - Text-only models disable image, PDF, and audio attachment actions. Multimodal capability is declared explicitly by each profile.
 
@@ -25,9 +26,9 @@ The built-in system prompt prioritizes local processing, evidence, workspace bou
 
 ### On-device models
 
-The APK embeds a real `llama.cpp` FFI runtime. GGUF loading and generation run through a worker Isolate, without a placeholder native bridge or remote inference dependency.
+The APK embeds a real `llama.cpp` FFI runtime. GGUF loading and generation run through a worker Isolate, without a placeholder native bridge or remote inference dependency. Mobile resource planning enforces a hard 60% physical-memory ceiling and shrinks context when necessary. Visual inputs are resized to a 1024 px long edge off the UI isolate, while local output is capped by model size so a remote 256K setting cannot freeze a phone-sized workload.
 
-The market contains only the following Q4_K_M packages. Every entry has a fixed download URL, byte size, source page, and SHA-256. Downloads resume from partial files and must pass hashing before installation.
+The following chat models provide Q4_K_M artifacts that the current APK can execute directly. Every entry has a fixed download URL, real byte size, source page, and SHA-256. Downloads resume from partial files and must pass hashing before installation.
 
 | Model | Size | Suggested minimum RAM | Source |
 |---|---:|---:|---|
@@ -44,14 +45,33 @@ The market contains only the following Q4_K_M packages. Every entry has a fixed 
 
 Model cards disclose licenses. Hunyuan packages are subject to the Tencent Hunyuan Community License; Qwen and Gemma entries follow the licenses shown on their respective model cards. A changed source or checksum mismatch prevents installation.
 
+### Unified model task catalog
+
+Model Market now manages chat, TTS, ASR, and OCR tasks in one catalog. Every entry has one explicit runtime state:
+
+- **Runnable on device**: the APK contains a native runtime that understands the model artifacts;
+- **Official files only**: SIQI can download and verify official files, but the bundled Android FFI cannot execute their current format;
+- **Awaiting compatible artifacts**: the compatibility target and official information remain visible, without a download action that is known to fail.
+
+The expanded catalog includes:
+
+| Category | Models |
+|---|---|
+| Chat | openPangu 2.0 7B, BlueLM 3.5 Nano, MiMo 3B, AndesGPT, plus the existing Hunyuan, Gemma 4, and Qwen3.5 families |
+| TTS | Supertonic 3, MOSS-TTS-Nano, Soprano-1.1-80M, Qwen3.5-TTS, Pangu-TTS |
+| ASR | Qwen3-ASR-1.7B, Qwen3.5-ASR, OctoASR, Moonshine, Pangu-ASR |
+| OCR | PP-OCRv6 Tiny, XCurOS-OCR, GLM-OCR, Qwen3.5-Vision, Pangu-Vision |
+
+Supertonic 3 uses `sherpa-onnx` FFI and a mainland-accessible ModelScope source, so it can synthesize speech locally. MOSS-TTS-Nano, Qwen3-ASR-1.7B, and GLM-OCR have verified official-file management, but their current official formats are not directly executable by the bundled FFI. Models without published, verifiable artifacts remain compatibility targets and are never presented as runnable downloads.
+
 ### Download and integrity workflow
 
 1. Open **Lab → Model market**.
 2. Review size, minimum memory, license, and official source.
-3. Start the download. Notification permission is requested only for progress notifications; denial does not stop the download.
+3. Start the download. Every artifact currently offered for download uses a ModelScope mainland CDN endpoint. Notification permission is requested only for progress notifications; denial does not stop the download.
 4. Pause and resume from the `.part` file as needed.
 5. SIQI calculates SHA-256 before renaming the completed file. A mismatched partial file is removed and logged.
-6. Installed-file checks are cached by path, size, and modification time, avoiding repeated full GGUF scans during UI rebuilds.
+6. Successful verification time is persisted. An unchanged file is trusted for 30 days; a modified or expired file is hashed again, avoiding a full GGUF scan on every cold start.
 
 ### MCP store and management
 
@@ -72,22 +92,34 @@ Regular users can configure URL-based MCP services only. stdio and command-based
 
 - Harness mode uses DeepSeek API profiles only.
 - A profile must pass a connection test first.
-- SIQI can verify and download the official npm runtime package.
+- SIQI can verify and download official npm runtime package `0.1.1-rc.2`.
 - It can synchronize and manage plugin source archives from the configured catalog.
 - The official runtime requires Node.js. The APK does not pretend to embed an incomplete runtime; it can connect to a compatible service started in Termux or on a LAN computer.
 - Plugins are downloaded and verified, never auto-executed.
 
-### Multimodal zone
+### TTS, ASR, and OCR
 
-The zone reads total and available device memory. Model plus task peak memory is hard-limited to 60% of total RAM, and remaining memory determines the suggested single-audio duration.
+SIQI integrates the real `sherpa_onnx 1.13.6` FFI runtime and exposes separate TTS, ASR, and OCR services under `lib/core/services/`. Services receive a model definition, allowing model switching while sharing integrity, runtime, and memory checks.
 
-Current verified official packages are:
+- **TTS**: Supertonic 3 generates a local WAV in a worker Isolate. Long-press an AI reply to choose **Read aloud**, and stop playback when needed.
+- **ASR**: the composer includes a recording button. Microphone permission is requested only after an explicit recording action. One audio item may be up to 180 minutes and is decoded in 30-second chunks without loading the full recording into Dart memory.
+- **Audio decoding**: Android MediaCodec converts MP3, M4A, AAC, FLAC, OGG, OPUS, AMR, 3GP, and MP4 inputs into a path-backed mono PCM WAV.
+- **OCR**: the composer can select an image from the gallery or screenshots. OCR reuses an installed Qwen3.5 or Gemma 4 vision model and projector, then inserts recognized text into the composer.
+- **Memory guard**: model artifacts plus working buffers must remain below 60% of physical memory; unsafe tasks are rejected before loading.
 
-- MiMo-V2.5-ASR: approximately 32.07 GB of weights;
-- MiMo-Audio-7B-Instruct plus Audio Tokenizer: approximately 23.85 GB;
-- no verified small quantized TTS/ASR package currently runs on this project’s Android runtime.
+The multimodal page reports total and available memory, the real runtime state of each model, and a suggested maximum audio duration. A model is shown as runnable only when it has a real source, complete verification metadata, a compatible Android runtime, and a safe memory peak.
 
-A roughly 24 GB or lower device therefore shows these packages as incompatible and blocks downloading. Official source links remain visible. Download becomes available only when a package has a real source, a working Android runtime, and a verified peak below the 60% limit.
+### Source file formats
+
+Chat attachments, OCR, and ASR share one file-reading layer:
+
+- code and scripts: Dart, Kotlin, Java, Python, JavaScript, TypeScript, Go, Rust, C/C++, Swift, Objective-C, C#, F#, Scala, Ruby, PHP, Lua, R, Perl, SQL, Shell, PowerShell, Gradle, Groovy, Vue, Svelte, and more;
+- text and configuration: TXT, Markdown, RST, TeX, JSON/JSONL, YAML, TOML, XML, HTML, CSS, CSV/TSV, INI, Properties, ENV, and logs;
+- office and electronic documents: PDF, DOCX, PPTX, XLSX, ODT, ODS, ODP, EPUB, RTF;
+- images: PNG, JPEG, WebP, GIF, BMP, TIFF, HEIC, HEIF;
+- audio: WAV, MP3, M4A, AAC, FLAC, OGG, OPUS, AMR, 3GP, MP4.
+
+Text files larger than 5 MB and long audio use streamed or path-backed processing. Office and OpenDocument files are extracted entry by entry, while image normalization runs off the UI thread to avoid large main-isolate copies.
 
 ### Workspaces and project files
 
@@ -177,6 +209,15 @@ API keys use Android encrypted storage; SQLite stores only non-secret profile da
 6. Each member reads the task and previous outputs; the coordinator produces the synthesis.
 7. Stop at any time or delete the local collaboration history.
 
+### Use local speech and OCR
+
+1. Open **Lab → Model Market** and filter by **Text to speech**, **Speech to text**, or **OCR**.
+2. Only entries marked as having a bundled on-device runtime can execute directly. An **official files only** entry is never passed to an incompatible runtime.
+3. After installing Supertonic 3, long-press any AI reply and select **Read aloud**.
+4. After installing a compatible ASR model, tap the microphone beside the composer to record, then tap again to stop and transcribe.
+5. After installing a Qwen3.5 or Gemma 4 model with its vision projector, tap the image-recognition button and select a gallery image or screenshot.
+6. Recording, transcription, OCR, and speech synthesis remain local. A remote request occurs only if the user later sends composer content through a remote chat model.
+
 ## Local data layout
 
 - `shared_preferences`: lightweight settings;
@@ -194,10 +235,10 @@ A `.siqi` export can contain sessions and code files. `.siji_config` configurati
 Install:
 
 - Git for Windows;
-- Flutter stable 3.38.0 or a compatible newer version;
+- Flutter stable 3.47.0 or a compatible newer version;
 - Android Studio;
-- Android SDK Platform 36;
-- Android SDK Build-Tools 36;
+- Android SDK Platform 37;
+- Android SDK Build-Tools 37;
 - Android SDK Command-line Tools;
 - Android NDK `29.0.14206865`;
 - CMake 3.22.1;
@@ -224,7 +265,7 @@ If a non-ASCII Windows user name, OneDrive, or a long project path breaks CMake/
 
 ```text
 C:\Users\Public\siqi-build-workspace
-C:\Users\Public\flutter-siqi-3.38.0
+C:\Users\Public\flutter-siqi-3.47.0
 C:\Users\Public\siqi-pub-cache
 C:\Users\Public\android-sdk
 ```
@@ -243,26 +284,37 @@ These can be directory junctions; the original project does not need to be moved
 flutter run --profile -d <device-id>
 ```
 
-### 4. Build an APK
+### 4. Build Debug and Release APKs
 
-Build a local arm64 Release APK:
+Run the shared checks first:
 
 ```powershell
 flutter clean
 flutter pub get
 flutter gen-l10n
 flutter analyze
-flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
-Output:
-
-`build/app/outputs/flutter-apk/app-arm64-v8a-release.apk`
-
-Install over the existing app without clearing data:
+Build an attachable Debug APK:
 
 ```powershell
-adb install -r build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+flutter build apk --debug
+adb install -r -t build/app/outputs/flutter-apk/app-debug.apk
+```
+
+Build the final Release APK:
+
+```powershell
+flutter build apk --release
+adb install -r build/app/outputs/flutter-apk/app-release.apk
+```
+
+The `-r` option preserves conversations, settings, and downloaded models. Do not uninstall or clear app data for upgrade verification.
+
+For an arm64-only distribution build, additionally run:
+
+```powershell
+flutter build apk --release --split-per-abi --target-platform android-arm64
 ```
 
 Configure an independent release key in `android/key.properties` before distribution. Without one, the project falls back to debug signing for local Release verification only and is not a store-ready package.
@@ -270,10 +322,14 @@ Configure an independent release key in `android/key.properties` before distribu
 ## Verified baseline
 
 - `flutter analyze`: zero issues;
-- Android 14-17 / arm64 Xiaomi 10-17 Series: Release upgrade installation succeeded;
-- Release version: `1.0.0 (2001)`;
-- cold-start Activity completed and the process remained alive;
-- APK contains `libllama_cpp.so` and `libomp.so`;
+- Android 17 / API 37 / arm64 device (`2206122SC`): both Debug and Release upgrade installations succeeded without clearing app data;
+- current version: `1.0.0-alpha.2 (4004)`;
+- the Qwen3.5-4B Q4_K_M model and vision projector resumed to completion and passed SHA-256 verification;
+- real on-device text inference succeeded, warm requests reuse the loaded engine, and Stop prevents concurrent generation on that engine;
+- a real image input was normalized to a 1024 px long edge and the 4B model streamed an answer consistent with the screenshot;
+- the Release process remains alive after a cold start, its manifest is not debuggable, and the APK passed 16 KB page and ZIP alignment verification;
+- APK contains `libllama.so`, `libllamadart.so`, `libggml*.so`, `libmtmd.so`, `libsherpa-onnx-c-api.so`, and `libonnxruntime.so` for text, Vulkan/CPU, multimodal projector, and speech runtimes;
+- representative Supertonic 3, Qwen3-ASR-1.7B, MOSS-TTS-Nano, and GLM-OCR ModelScope artifact URLs returned HTTP 200;
 - no Flutter or Dart crash was observed;
 - secure lock screen prevented automated visual page traversal; unlock the phone before continued interaction testing.
 
@@ -282,6 +338,7 @@ Configure an independent release key in `android/key.properties` before distribu
 - SIQI does not bypass the device lock screen, sandbox, SELinux, or Scoped Storage.
 - Downloaded MCP or Harness content does not execute unless a developer explicitly configures and starts it.
 - The market does not show unverified model downloads.
+- A downloadable official weight is never mislabeled as executable by the current APK; model cards disclose the runtime state.
 - Remote destinations are never concealed.
 - Agent and Shell features can modify local files; back up important workspaces.
 - GitHub OAuth, vendor APIs, MCP services, and mirrors remain subject to their providers’ availability.
