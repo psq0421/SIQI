@@ -154,7 +154,7 @@
   "exportReady": "エクスポートファイルを作成しました",
   "importFailed": "インポート失敗：{reason}",
   "apiProjection": "カスタム API 投射",
-  "manageProviders": "プロバイダー、互換形式、カスタム Headers を管理",
+  "manageProviders": "プロバイダーを管理し、利用可能なモデルを自動取得",
   "quotaStatistics": "使用量統計",
   "inputTokens": "入力 Tokens",
   "outputTokens": "出力 Tokens",
@@ -175,8 +175,6 @@
   "apiKey": "API Key",
   "apiFormat": "API 形式",
   "multimodal": "マルチモーダル",
-  "customHeaders": "カスタム Headers",
-  "headersHint": "例：'{\"X-Custom\":\"value\"}'",
   "testConnection": "接続テスト",
   "testing": "テスト中…",
   "testSuccess": "接続テスト成功",
@@ -552,5 +550,19 @@
   "inputPricePerMillion": "入力単価 / 100 万 Tokens",
   "outputPricePerMillion": "出力単価 / 100 万 Tokens",
   "configuredModelCount": "{count} モデル",
-  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}}
+  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}},
+  "fetchModels": "モデル一覧を取得",
+  "fetchingModels": "モデルを取得中…",
+  "modelListFromBaseUrl": "モデルは Base URL から自動取得されます。モデル ID の手入力は不要です。",
+  "selectModels": "利用可能なモデル",
+  "modelsFetched": "{count} 個のモデルを取得しました",
+  "@modelsFetched": {"placeholders": {"count": {"type": "int"}}},
+  "reasoningCapableModels": "推論対応モデル",
+  "reasoningEffort": "推論の強度",
+  "reasoningEffortDescription": "推論対応としてマークされたモデルにのみ適用されます。",
+  "reasoningOff": "オフ",
+  "reasoningLow": "低",
+  "reasoningMedium": "中",
+  "reasoningHigh": "高"
+  ,"modelFilesDetected": "モデルファイルを検出"
 }

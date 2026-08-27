@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -141,11 +139,8 @@ class _ApiProfileEditor extends ConsumerStatefulWidget {
 class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
   late final TextEditingController _name;
   late final TextEditingController _baseUrl;
-  late final TextEditingController _model;
   late final TextEditingController _apiKey;
-  late final TextEditingController _headers;
   late final TextEditingController _notes;
-  late final TextEditingController _mappings;
   late final TextEditingController _currency;
   late final TextEditingController _inputPrice;
   late final TextEditingController _outputPrice;
@@ -153,6 +148,11 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
   late ApiFormat _format;
   late bool _multimodal;
   bool _testing = false;
+  bool _fetchingModels = false;
+  late List<String> _availableModels;
+  late Set<String> _selectedModels;
+  late Set<String> _reasoningModels;
+  String? _fallbackModel;
   String? _error;
 
   @override
@@ -167,21 +167,12 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     _baseUrl = TextEditingController(
       text: profile?.baseUrl ?? initialTemplate.baseUrl,
     );
-    _model = TextEditingController(text: profile?.defaultModelId ?? '');
     _apiKey = TextEditingController();
-    _headers = TextEditingController(
-      text: const JsonEncoder.withIndent(
-        '  ',
-      ).convert(profile?.headers ?? const <String, String>{}),
-    );
     _notes = TextEditingController(text: profile?.notes ?? '');
-    _mappings = TextEditingController(
-      text:
-          profile?.modelMappings.entries
-              .map((entry) => '${entry.key} = ${entry.value}')
-              .join('\n') ??
-          '',
-    );
+    _availableModels = profile?.selectableModels.values.toSet().toList() ?? [];
+    _selectedModels = {..._availableModels};
+    _reasoningModels = {...?profile?.reasoningModelIds};
+    _fallbackModel = profile?.defaultModelId;
     _currency = TextEditingController(text: profile?.billingCurrency ?? '');
     _inputPrice = TextEditingController(
       text: profile?.inputPricePerMillion?.toString() ?? '',
@@ -198,11 +189,8 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
   void dispose() {
     _name.dispose();
     _baseUrl.dispose();
-    _model.dispose();
     _apiKey.dispose();
-    _headers.dispose();
     _notes.dispose();
-    _mappings.dispose();
     _currency.dispose();
     _inputPrice.dispose();
     _outputPrice.dispose();
@@ -221,53 +209,15 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     });
   }
 
-  Map<String, String>? _parseHeaders() {
-    try {
-      final value = jsonDecode(
-        _headers.text.trim().isEmpty ? '{}' : _headers.text,
-      );
-      if (value is! Map ||
-          value.keys.any((key) => key is! String) ||
-          value.values.any((item) => item is! String)) {
-        return null;
-      }
-      return value.map(
-        (key, value) => MapEntry(key as String, value as String),
-      );
-    } on Object {
-      return null;
-    }
-  }
-
-  Map<String, String>? _parseMappings() {
-    final result = <String, String>{};
-    for (final rawLine in const LineSplitter().convert(_mappings.text)) {
-      final line = rawLine.trim();
-      if (line.isEmpty) continue;
-      final separator = line.indexOf('=');
-      if (separator <= 0 || separator == line.length - 1) return null;
-      final alias = line.substring(0, separator).trim();
-      final upstream = line.substring(separator + 1).trim();
-      if (alias.isEmpty || upstream.isEmpty) return null;
-      result[alias] = upstream;
-    }
-    return result;
-  }
-
   double? _optionalPrice(TextEditingController controller) {
     final value = controller.text.trim();
     return value.isEmpty ? null : double.tryParse(value);
   }
 
   ApiProfile? _build({DateTime? testedAt}) {
-    final headers = _parseHeaders();
-    final mappings = _parseMappings();
+    final fallback = _fallbackModel;
     final inputPrice = _optionalPrice(_inputPrice);
     final outputPrice = _optionalPrice(_outputPrice);
-    if (headers == null || mappings == null) {
-      setState(() => _error = context.l10n.invalidJson);
-      return null;
-    }
     if ((_inputPrice.text.trim().isNotEmpty && inputPrice == null) ||
         (_outputPrice.text.trim().isNotEmpty && outputPrice == null)) {
       setState(() => _error = context.l10n.requiredField);
@@ -275,7 +225,8 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     }
     if (_name.text.trim().isEmpty ||
         _baseUrl.text.trim().isEmpty ||
-        _model.text.trim().isEmpty) {
+        fallback == null ||
+        _selectedModels.isEmpty) {
       setState(() => _error = context.l10n.requiredField);
       return null;
     }
@@ -285,21 +236,67 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
       name: _name.text.trim(),
       providerId: _templateId,
       baseUrl: _baseUrl.text.trim(),
-      modelId: _model.text.trim(),
+      modelId: fallback,
       format: _format,
       isMultimodal: _multimodal,
       notes: _notes.text.trim(),
-      modelMappings: mappings,
-      fallbackModelId: _model.text.trim(),
+      modelMappings: {for (final model in _selectedModels) model: model},
+      reasoningModelIds: _reasoningModels.intersection(_selectedModels),
+      fallbackModelId: fallback,
       billingCurrency: _currency.text.trim(),
       inputPricePerMillion: inputPrice,
       outputPricePerMillion: outputPrice,
-      headers: headers,
       lastTestedAt: testedAt ?? existing?.lastTestedAt,
       inputTokens: existing?.inputTokens ?? 0,
       outputTokens: existing?.outputTokens ?? 0,
       estimatedCost: existing?.estimatedCost ?? 0,
     );
+  }
+
+  Future<String> _apiKeyForRequest() async {
+    if (_apiKey.text.trim().isNotEmpty) return _apiKey.text.trim();
+    final existing = widget.profile;
+    if (existing == null) return '';
+    return await ref.read(secureKeyServiceProvider).readApiKey(existing.id) ??
+        '';
+  }
+
+  Future<void> _fetchModels() async {
+    if (_baseUrl.text.trim().isEmpty) {
+      setState(() => _error = context.l10n.requiredField);
+      return;
+    }
+    setState(() {
+      _fetchingModels = true;
+      _error = null;
+    });
+    try {
+      final models = await ref
+          .read(apiServiceProvider)
+          .fetchModels(
+            baseUrl: _baseUrl.text.trim(),
+            format: _format,
+            apiKey: await _apiKeyForRequest(),
+          );
+      if (!mounted) return;
+      setState(() {
+        _availableModels = models;
+        _selectedModels = {...models};
+        _reasoningModels = models.where(_looksLikeReasoningModel).toSet();
+        _fallbackModel = models.contains(_fallbackModel)
+            ? _fallbackModel
+            : models.first;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.modelsFetched(models.length))),
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        setState(() => _error = context.l10n.testFailed(error.toString()));
+      }
+    } finally {
+      if (mounted) setState(() => _fetchingModels = false);
+    }
   }
 
   Future<void> _save() async {
@@ -341,11 +338,11 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
         isMultimodal: profile.isMultimodal,
         notes: profile.notes,
         modelMappings: profile.modelMappings,
+        reasoningModelIds: profile.reasoningModelIds,
         fallbackModelId: profile.fallbackModelId,
         billingCurrency: profile.billingCurrency,
         inputPricePerMillion: profile.inputPricePerMillion,
         outputPricePerMillion: profile.outputPricePerMillion,
-        headers: profile.headers,
         lastTestedAt: DateTime.now(),
         inputTokens: profile.inputTokens,
         outputTokens: profile.outputTokens,
@@ -446,24 +443,6 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: _model,
-                decoration: InputDecoration(
-                  labelText: context.l10n.fallbackModel,
-                  hintText: context.l10n.fallbackModelHint,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: _mappings,
-                minLines: 3,
-                maxLines: 8,
-                decoration: InputDecoration(
-                  labelText: context.l10n.modelMappings,
-                  hintText: context.l10n.modelMappingsHint,
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
                 controller: _apiKey,
                 obscureText: true,
                 decoration: InputDecoration(
@@ -490,23 +469,105 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
                 onSelectionChanged: (value) =>
                     setState(() => _format = value.first),
               ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _fetchingModels ? null : _fetchModels,
+                icon: _fetchingModels
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const SiqiIcon(SiqiGlyph.refresh),
+                label: Text(
+                  _fetchingModels
+                      ? context.l10n.fetchingModels
+                      : context.l10n.fetchModels,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                context.l10n.modelListFromBaseUrl,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              if (_availableModels.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Text(
+                  context.l10n.selectModels,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final model in _availableModels)
+                      FilterChip(
+                        label: Text(model),
+                        selected: _selectedModels.contains(model),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _selectedModels.add(model);
+                            _fallbackModel ??= model;
+                          } else if (_selectedModels.length > 1) {
+                            _selectedModels.remove(model);
+                            if (_fallbackModel == model) {
+                              _fallbackModel = _selectedModels.first;
+                            }
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  context.l10n.reasoningCapableModels,
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    for (final model in _selectedModels)
+                      FilterChip(
+                        label: Text(model),
+                        selected: _reasoningModels.contains(model),
+                        onSelected: (selected) => setState(() {
+                          if (selected) {
+                            _reasoningModels.add(model);
+                          } else {
+                            _reasoningModels.remove(model);
+                          }
+                        }),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_fallbackModel),
+                  initialValue: _selectedModels.contains(_fallbackModel)
+                      ? _fallbackModel
+                      : null,
+                  decoration: InputDecoration(
+                    labelText: context.l10n.fallbackModel,
+                  ),
+                  items: _selectedModels
+                      .map(
+                        (model) => DropdownMenuItem(
+                          value: model,
+                          child: Text(model, overflow: TextOverflow.ellipsis),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) => setState(() => _fallbackModel = value),
+                ),
+              ],
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 value: _multimodal,
                 onChanged: (value) => setState(() => _multimodal = value),
                 title: Text(context.l10n.multimodal),
               ),
-              TextField(
-                controller: _headers,
-                minLines: 3,
-                maxLines: 8,
-                style: const TextStyle(fontFamily: 'monospace'),
-                decoration: InputDecoration(
-                  labelText: context.l10n.customHeaders,
-                  hintText: context.l10n.headersHint,
-                ),
-              ),
-              const SizedBox(height: 10),
               ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 title: Text(context.l10n.billingConfiguration),
@@ -601,4 +662,14 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
       ),
     );
   }
+}
+
+bool _looksLikeReasoningModel(String modelId) {
+  final id = modelId.toLowerCase();
+  return id.contains('reason') ||
+      id.contains('thinking') ||
+      id.contains('deepseek-r1') ||
+      id.contains('deepseek-reasoner') ||
+      id.contains('qwq') ||
+      RegExp(r'(^|[-_/])o[134]([-.]|$)').hasMatch(id);
 }

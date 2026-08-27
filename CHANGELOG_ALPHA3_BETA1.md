@@ -35,7 +35,7 @@ This release contains all storage, permission, local-model, multimodal, and API-
 
 #### One API key, multiple models
 
-- Expanded provider profiles with provider name, notes, API key, endpoint, and custom headers.
+- Expanded provider profiles with provider name, notes, API key, and endpoint; available models are now discovered automatically from the Base URL.
 - One API key can expose multiple display-name-to-upstream-model mappings.
 - Added a configurable fallback model.
 - Added per-model multimodal capability metadata.
@@ -131,7 +131,7 @@ The current locally distributed APK uses a development signing certificate for u
 
 #### 一枚 API Key 管理多个模型
 
-- 供应商配置新增供应商名称、备注、API Key、请求地址和自定义 Headers。
+- 供应商配置包含供应商名称、备注、API Key 与请求地址；可用模型现由 Base URL 自动获取。
 - 同一枚 API Key 可以维护多条“显示名称 → 上游模型 ID”映射。
 - 新增默认兜底模型配置。
 - 支持为每个模型单独标记多模态能力。

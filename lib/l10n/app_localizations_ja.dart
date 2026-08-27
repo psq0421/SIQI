@@ -500,7 +500,7 @@ class AppLocalizationsJa extends AppLocalizations {
   String get apiProjection => 'カスタム API 投射';
 
   @override
-  String get manageProviders => 'プロバイダー、互換形式、カスタム Headers を管理';
+  String get manageProviders => 'プロバイダーを管理し、利用可能なモデルを自動取得';
 
   @override
   String get quotaStatistics => '使用量統計';
@@ -561,12 +561,6 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get multimodal => 'マルチモーダル';
-
-  @override
-  String get customHeaders => 'カスタム Headers';
-
-  @override
-  String get headersHint => '例：{\"X-Custom\":\"value\"}';
 
   @override
   String get testConnection => '接続テスト';
@@ -1743,4 +1737,46 @@ class AppLocalizationsJa extends AppLocalizations {
   String configuredModelCount(int count) {
     return '$count モデル';
   }
+
+  @override
+  String get fetchModels => 'モデル一覧を取得';
+
+  @override
+  String get fetchingModels => 'モデルを取得中…';
+
+  @override
+  String get modelListFromBaseUrl =>
+      'モデルは Base URL から自動取得されます。モデル ID の手入力は不要です。';
+
+  @override
+  String get selectModels => '利用可能なモデル';
+
+  @override
+  String modelsFetched(int count) {
+    return '$count 個のモデルを取得しました';
+  }
+
+  @override
+  String get reasoningCapableModels => '推論対応モデル';
+
+  @override
+  String get reasoningEffort => '推論の強度';
+
+  @override
+  String get reasoningEffortDescription => '推論対応としてマークされたモデルにのみ適用されます。';
+
+  @override
+  String get reasoningOff => 'オフ';
+
+  @override
+  String get reasoningLow => '低';
+
+  @override
+  String get reasoningMedium => '中';
+
+  @override
+  String get reasoningHigh => '高';
+
+  @override
+  String get modelFilesDetected => 'モデルファイルを検出';
 }

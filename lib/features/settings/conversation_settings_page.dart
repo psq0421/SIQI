@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/icons/siqi_icons.dart';
+import '../../core/models/app_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../l10n/l10n.dart';
 
@@ -80,6 +81,34 @@ class _ConversationSettingsPageState
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
+          DropdownButtonFormField<ReasoningEffort>(
+            initialValue: settings.reasoningEffort,
+            decoration: InputDecoration(
+              labelText: context.l10n.reasoningEffort,
+              helperText: context.l10n.reasoningEffortDescription,
+              prefixIcon: const Padding(
+                padding: EdgeInsets.all(12),
+                child: SiqiIcon(SiqiGlyph.sparkles),
+              ),
+            ),
+            items: ReasoningEffort.values
+                .map(
+                  (value) => DropdownMenuItem(
+                    value: value,
+                    child: Text(switch (value) {
+                      ReasoningEffort.off => context.l10n.reasoningOff,
+                      ReasoningEffort.low => context.l10n.reasoningLow,
+                      ReasoningEffort.medium => context.l10n.reasoningMedium,
+                      ReasoningEffort.high => context.l10n.reasoningHigh,
+                    }),
+                  ),
+                )
+                .toList(),
+            onChanged: (value) => value == null
+                ? null
+                : update((current) => current.copyWith(reasoningEffort: value)),
+          ),
+          const SizedBox(height: 12),
           DropdownButtonFormField<int>(
             initialValue: _contextOptions.contains(settings.contextWindow)
                 ? settings.contextWindow

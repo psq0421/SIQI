@@ -519,7 +519,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get manageProviders =>
-      'Manage providers, compatible formats, and custom headers';
+      'Manage providers and automatically discover available models';
 
   @override
   String get quotaStatistics => 'Usage statistics';
@@ -580,12 +580,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get multimodal => 'Multimodal';
-
-  @override
-  String get customHeaders => 'Custom headers';
-
-  @override
-  String get headersHint => 'Example: {\"X-Custom\":\"value\"}';
 
   @override
   String get testConnection => 'Test connection';
@@ -1803,4 +1797,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String configuredModelCount(int count) {
     return '$count models';
   }
+
+  @override
+  String get fetchModels => 'Get model list';
+
+  @override
+  String get fetchingModels => 'Getting models…';
+
+  @override
+  String get modelListFromBaseUrl =>
+      'Models are read from the Base URL. You do not need to enter model IDs manually.';
+
+  @override
+  String get selectModels => 'Available models';
+
+  @override
+  String modelsFetched(int count) {
+    return 'Found $count models';
+  }
+
+  @override
+  String get reasoningCapableModels => 'Models with reasoning support';
+
+  @override
+  String get reasoningEffort => 'Reasoning strength';
+
+  @override
+  String get reasoningEffortDescription =>
+      'Applied only to models marked as reasoning-capable.';
+
+  @override
+  String get reasoningOff => 'Off';
+
+  @override
+  String get reasoningLow => 'Low';
+
+  @override
+  String get reasoningMedium => 'Medium';
+
+  @override
+  String get reasoningHigh => 'High';
+
+  @override
+  String get modelFilesDetected => 'Model files detected';
 }

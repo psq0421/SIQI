@@ -39,14 +39,19 @@ class ModelDownloadService {
     return p.join(directory.path, 'models');
   }
 
-  Future<String?> installedPath(String modelId) async {
-    final artifacts = await _database.listDownloadedModelArtifacts(modelId);
+  Future<String?> installedPath(ModelDefinition model) async {
+    final artifacts = await _database.listDownloadedModelArtifacts(model.id);
     for (final record in artifacts) {
       if (record['role'] != ModelArtifactRole.model.name) continue;
       if (await _verifiedRecordPath(record) case final path?) return path;
     }
-    final legacy = await _database.downloadedModel(modelId);
-    return legacy == null ? null : _verifiedRecordPath(legacy);
+    final legacy = await _database.downloadedModel(model.id);
+    if (legacy != null) {
+      final path = await _verifiedRecordPath(legacy);
+      if (path != null) return path;
+    }
+    final primary = model.primaryArtifact;
+    return primary == null ? null : _discoverLegacyArtifact(model, primary);
   }
 
   Future<Map<String, String>> installedArtifactPaths(
@@ -54,7 +59,7 @@ class ModelDownloadService {
   ) async {
     final result = <String, String>{};
     for (final artifact in model.installArtifacts) {
-      final path = await _installedArtifactPath(model.id, artifact);
+      final path = await _installedArtifactPath(model, artifact);
       if (path != null) result[artifact.id] = path;
     }
     return result;
@@ -106,17 +111,84 @@ class ModelDownloadService {
   }
 
   Future<String?> _installedArtifactPath(
-    String modelId,
+    ModelDefinition model,
     ModelArtifact artifact,
   ) async {
     final record = await _database.downloadedModelArtifact(
-      modelId,
+      model.id,
       artifact.id,
     );
     if (record != null) return _verifiedRecordPath(record);
     if (artifact.role == ModelArtifactRole.model) {
-      final legacy = await _database.downloadedModel(modelId);
-      if (legacy != null) return _verifiedRecordPath(legacy);
+      final legacy = await _database.downloadedModel(model.id);
+      if (legacy != null) {
+        final path = await _verifiedRecordPath(legacy);
+        if (path != null) return path;
+      }
+    }
+    return _discoverLegacyArtifact(model, artifact);
+  }
+
+  Future<String?> _discoverLegacyArtifact(
+    ModelDefinition model,
+    ModelArtifact artifact,
+  ) async {
+    final support = await getApplicationSupportDirectory();
+    final documents = await getApplicationDocumentsDirectory();
+    final external = await getExternalStorageDirectory();
+    final roots = <String>{
+      p.join(support.path, 'models'),
+      p.join(support.path, 'Models'),
+      p.join(documents.path, 'models'),
+      p.join(documents.path, 'Models'),
+      if (external != null) p.join(external.path, 'models'),
+      if (external != null) p.join(external.path, 'Models'),
+    };
+    final sourceName = Uri.tryParse(artifact.downloadUrl)?.pathSegments.last;
+    final names = <String>{
+      artifact.fileName,
+      if (sourceName != null && sourceName.isNotEmpty)
+        Uri.decodeComponent(sourceName),
+      '${model.id}.${artifact.format.name}',
+    };
+    for (final root in roots) {
+      for (final name in names) {
+        for (final path in [p.join(root, model.id, name), p.join(root, name)]) {
+          final file = File(path);
+          if (!await file.exists()) continue;
+          final stat = await file.stat();
+          if (stat.size != artifact.sizeBytes) continue;
+          final checksum = (await sha256.bind(file.openRead()).first)
+              .toString();
+          if (checksum.toLowerCase() != artifact.expectedSha256.toLowerCase()) {
+            continue;
+          }
+          await _database.saveModelArtifact(
+            modelId: model.id,
+            artifact: artifact,
+            path: file.path,
+            size: stat.size,
+            checksum: checksum,
+            etag: null,
+            lastModified: null,
+          );
+          if (artifact.role == ModelArtifactRole.model) {
+            await _database.saveDownloadedModel(
+              model.id,
+              file.path,
+              stat.size,
+              checksum: checksum,
+            );
+          }
+          await _database.addWorkLog(
+            category: 'model',
+            title: 'migrate:${model.id}',
+            detail: file.path,
+            status: 'completed',
+          );
+          return file.path;
+        }
+      }
     }
     return null;
   }
@@ -268,7 +340,7 @@ class ModelDownloadService {
         );
         aggregateCompleted += artifact.sizeBytes;
       }
-      final primary = await installedPath(model.id);
+      final primary = await installedPath(model);
       if (primary == null) throw const FormatException('model-file-missing');
       await _database.addWorkLog(
         category: 'model',

@@ -21,6 +21,7 @@ class LocalDatabase {
         if (oldVersion < 3) await _createOperationalTables(db);
         if (oldVersion < 4) await _createAlpha2Tables(db);
         if (oldVersion < 5) await _upgradeApiProfilesForAlpha3(db);
+        if (oldVersion < 6) await _upgradeApiProfilesForReasoning(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -57,6 +58,7 @@ class LocalDatabase {
             is_multimodal INTEGER NOT NULL,
             notes TEXT NOT NULL DEFAULT '',
             model_mappings_json TEXT NOT NULL DEFAULT '{}',
+            reasoning_model_ids_json TEXT NOT NULL DEFAULT '[]',
             fallback_model_id TEXT NOT NULL DEFAULT '',
             billing_currency TEXT NOT NULL DEFAULT '',
             input_price_per_million REAL,
@@ -146,6 +148,13 @@ class LocalDatabase {
     await db.execute(
       'ALTER TABLE api_profiles ADD COLUMN output_price_per_million REAL',
     );
+  }
+
+  static Future<void> _upgradeApiProfilesForReasoning(Database db) async {
+    await db.execute(
+      "ALTER TABLE api_profiles ADD COLUMN reasoning_model_ids_json TEXT NOT NULL DEFAULT '[]'",
+    );
+    await db.update('api_profiles', {'headers_json': '{}'});
   }
 
   static Future<void> _createOperationalTables(Database db) async {

@@ -489,7 +489,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get apiProjection => '自定义 API 投射';
 
   @override
-  String get manageProviders => '管理厂商、兼容格式与自定义 Headers';
+  String get manageProviders => '管理供应商并自动获取可用模型';
 
   @override
   String get quotaStatistics => '额度统计';
@@ -550,12 +550,6 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get multimodal => '支持多模态';
-
-  @override
-  String get customHeaders => '自定义 Headers';
-
-  @override
-  String get headersHint => '例如：{\"X-Custom\":\"value\"}';
 
   @override
   String get testConnection => '测试连接';
@@ -1708,6 +1702,47 @@ class AppLocalizationsZh extends AppLocalizations {
   String configuredModelCount(int count) {
     return '$count 个模型';
   }
+
+  @override
+  String get fetchModels => '获取模型列表';
+
+  @override
+  String get fetchingModels => '正在获取模型…';
+
+  @override
+  String get modelListFromBaseUrl => '模型将从 Base URL 自动读取，无需手动填写模型 ID。';
+
+  @override
+  String get selectModels => '可用模型';
+
+  @override
+  String modelsFetched(int count) {
+    return '已获取 $count 个模型';
+  }
+
+  @override
+  String get reasoningCapableModels => '支持思考的模型';
+
+  @override
+  String get reasoningEffort => '思考强度';
+
+  @override
+  String get reasoningEffortDescription => '仅对已标记为支持思考的模型生效。';
+
+  @override
+  String get reasoningOff => '关闭';
+
+  @override
+  String get reasoningLow => '低';
+
+  @override
+  String get reasoningMedium => '中';
+
+  @override
+  String get reasoningHigh => '高';
+
+  @override
+  String get modelFilesDetected => '已检测到模型文件';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
@@ -2195,7 +2230,7 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get apiProjection => '自訂 API 投射';
 
   @override
-  String get manageProviders => '管理廠商、相容格式與自訂 Headers';
+  String get manageProviders => '管理供應商並自動取得可用模型';
 
   @override
   String get quotaStatistics => '額度統計';
@@ -2256,12 +2291,6 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get multimodal => '支援多模態';
-
-  @override
-  String get customHeaders => '自訂 Headers';
-
-  @override
-  String get headersHint => '例如：{\"X-Custom\":\"value\"}';
 
   @override
   String get testConnection => '測試連線';
@@ -3415,4 +3444,45 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String configuredModelCount(int count) {
     return '$count 個模型';
   }
+
+  @override
+  String get fetchModels => '取得模型清單';
+
+  @override
+  String get fetchingModels => '正在取得模型…';
+
+  @override
+  String get modelListFromBaseUrl => '模型將從 Base URL 自動讀取，無需手動填寫模型 ID。';
+
+  @override
+  String get selectModels => '可用模型';
+
+  @override
+  String modelsFetched(int count) {
+    return '已取得 $count 個模型';
+  }
+
+  @override
+  String get reasoningCapableModels => '支援思考的模型';
+
+  @override
+  String get reasoningEffort => '思考強度';
+
+  @override
+  String get reasoningEffortDescription => '僅對已標記為支援思考的模型生效。';
+
+  @override
+  String get reasoningOff => '關閉';
+
+  @override
+  String get reasoningLow => '低';
+
+  @override
+  String get reasoningMedium => '中';
+
+  @override
+  String get reasoningHigh => '高';
+
+  @override
+  String get modelFilesDetected => '已偵測到模型檔案';
 }

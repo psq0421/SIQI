@@ -5,7 +5,7 @@ abstract final class AppConstants {
   static const exportExtension = 'siqi';
   static const configExtension = 'siji_config';
   static const databaseName = 'siqi_local.db';
-  static const databaseVersion = 5;
+  static const databaseVersion = 6;
   static const preferredProjectsPath = '/storage/emulated/0/Siqi/Projects';
   static const githubCallbackScheme = 'siqi';
   static const projectUrl = 'https://github.com/psq0421/SIQI';

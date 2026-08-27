@@ -295,12 +295,19 @@ class _ModelDownloadCard extends ConsumerWidget {
                         icon: const SiqiIcon(SiqiGlyph.info),
                         label: Text(context.l10n.awaitingOfficialArtifacts),
                       )
-                    : FutureBuilder<bool>(
+                    : FutureBuilder<Map<String, String>>(
                         future: ref
                             .read(modelDownloadServiceProvider)
-                            .isFullyInstalled(model),
+                            .installedArtifactPaths(model),
                         builder: (context, snapshot) {
-                          if (snapshot.data == true) {
+                          final installed = snapshot.data ?? const {};
+                          if (installed.isNotEmpty) {
+                            final complete = model.installArtifacts
+                                .where((artifact) => !artifact.optional)
+                                .every(
+                                  (artifact) =>
+                                      installed.containsKey(artifact.id),
+                                );
                             return Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
@@ -309,7 +316,11 @@ class _ModelDownloadCard extends ConsumerWidget {
                                     SiqiGlyph.check,
                                     size: 18,
                                   ),
-                                  label: Text(context.l10n.installed),
+                                  label: Text(
+                                    complete
+                                        ? context.l10n.installed
+                                        : context.l10n.modelFilesDetected,
+                                  ),
                                 ),
                                 IconButton(
                                   tooltip: context.l10n.removeModel,

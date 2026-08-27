@@ -154,7 +154,7 @@
   "exportReady": "Export file created",
   "importFailed": "Import failed: {reason}",
   "apiProjection": "Custom API projection",
-  "manageProviders": "Manage providers, compatible formats, and custom headers",
+  "manageProviders": "Manage providers and automatically discover available models",
   "quotaStatistics": "Usage statistics",
   "inputTokens": "Input tokens",
   "outputTokens": "Output tokens",
@@ -175,8 +175,6 @@
   "apiKey": "API key",
   "apiFormat": "API format",
   "multimodal": "Multimodal",
-  "customHeaders": "Custom headers",
-  "headersHint": "Example: '{\"X-Custom\":\"value\"}'",
   "testConnection": "Test connection",
   "testing": "Testing…",
   "testSuccess": "Connection test passed",
@@ -552,5 +550,19 @@
   "inputPricePerMillion": "Input price / 1M tokens",
   "outputPricePerMillion": "Output price / 1M tokens",
   "configuredModelCount": "{count} models",
-  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}}
+  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}},
+  "fetchModels": "Get model list",
+  "fetchingModels": "Getting models…",
+  "modelListFromBaseUrl": "Models are read from the Base URL. You do not need to enter model IDs manually.",
+  "selectModels": "Available models",
+  "modelsFetched": "Found {count} models",
+  "@modelsFetched": {"placeholders": {"count": {"type": "int"}}},
+  "reasoningCapableModels": "Models with reasoning support",
+  "reasoningEffort": "Reasoning strength",
+  "reasoningEffortDescription": "Applied only to models marked as reasoning-capable.",
+  "reasoningOff": "Off",
+  "reasoningLow": "Low",
+  "reasoningMedium": "Medium",
+  "reasoningHigh": "High"
+  ,"modelFilesDetected": "Model files detected"
 }

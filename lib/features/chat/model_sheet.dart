@@ -220,9 +220,7 @@ class _ModelTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final trailing = model.family == ModelFamily.local
         ? FutureBuilder<String?>(
-            future: ref
-                .read(modelDownloadServiceProvider)
-                .installedPath(model.id),
+            future: ref.read(modelDownloadServiceProvider).installedPath(model),
             builder: (context, snapshot) => Text(
               snapshot.data == null
                   ? context.l10n.notInstalled

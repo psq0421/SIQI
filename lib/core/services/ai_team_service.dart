@@ -92,6 +92,7 @@ Round: ${round + 1}/${team.maxRounds.clamp(1, 4)}.
             temperature: settings.temperature,
             topP: settings.topP,
             maxTokens: settings.maxTokens.clamp(256, 8192),
+            reasoningEffort: settings.reasoningEffort,
             cancelToken: cancelToken,
           );
           totalInput += result.usage.input;
@@ -136,6 +137,7 @@ Round: ${round + 1}/${team.maxRounds.clamp(1, 4)}.
         temperature: 0.2,
         topP: settings.topP,
         maxTokens: settings.maxTokens.clamp(256, 8192),
+        reasoningEffort: settings.reasoningEffort,
         cancelToken: cancelToken,
       );
       totalInput += synthesis.usage.input;

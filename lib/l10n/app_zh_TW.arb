@@ -154,7 +154,7 @@
   "exportReady": "匯出檔案已產生",
   "importFailed": "匯入失敗：{reason}",
   "apiProjection": "自訂 API 投射",
-  "manageProviders": "管理廠商、相容格式與自訂 Headers",
+  "manageProviders": "管理供應商並自動取得可用模型",
   "quotaStatistics": "額度統計",
   "inputTokens": "輸入 Tokens",
   "outputTokens": "輸出 Tokens",
@@ -175,8 +175,6 @@
   "apiKey": "API Key",
   "apiFormat": "介面格式",
   "multimodal": "支援多模態",
-  "customHeaders": "自訂 Headers",
-  "headersHint": "例如：'{\"X-Custom\":\"value\"}'",
   "testConnection": "測試連線",
   "testing": "測試中…",
   "testSuccess": "連線測試成功",
@@ -552,5 +550,19 @@
   "inputPricePerMillion": "輸入單價 / 百萬 Tokens",
   "outputPricePerMillion": "輸出單價 / 百萬 Tokens",
   "configuredModelCount": "{count} 個模型",
-  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}}
+  "@configuredModelCount": {"placeholders": {"count": {"type": "int"}}},
+  "fetchModels": "取得模型清單",
+  "fetchingModels": "正在取得模型…",
+  "modelListFromBaseUrl": "模型將從 Base URL 自動讀取，無需手動填寫模型 ID。",
+  "selectModels": "可用模型",
+  "modelsFetched": "已取得 {count} 個模型",
+  "@modelsFetched": {"placeholders": {"count": {"type": "int"}}},
+  "reasoningCapableModels": "支援思考的模型",
+  "reasoningEffort": "思考強度",
+  "reasoningEffortDescription": "僅對已標記為支援思考的模型生效。",
+  "reasoningOff": "關閉",
+  "reasoningLow": "低",
+  "reasoningMedium": "中",
+  "reasoningHigh": "高"
+  ,"modelFilesDetected": "已偵測到模型檔案"
 }

@@ -16,6 +16,8 @@ enum ModelFamily { customApi, local }
 
 enum ApiFormat { openAi, anthropic, local }
 
+enum ReasoningEffort { off, low, medium, high }
+
 enum ModelTask {
   chat,
   visionLanguage,
@@ -82,6 +84,7 @@ Available variables: {user_name}, {current_time}.
     this.temperature = 0.7,
     this.topP = 0.9,
     this.maxTokens = 4096,
+    this.reasoningEffort = ReasoningEffort.medium,
     this.systemPrompt = defaultSystemPrompt,
     this.saveInterval = SaveInterval.realtime,
     this.modelStoragePath,
@@ -113,6 +116,7 @@ Available variables: {user_name}, {current_time}.
   final double temperature;
   final double topP;
   final int maxTokens;
+  final ReasoningEffort reasoningEffort;
   final String systemPrompt;
   final SaveInterval saveInterval;
   final String? modelStoragePath;
@@ -144,6 +148,7 @@ Available variables: {user_name}, {current_time}.
     double? temperature,
     double? topP,
     int? maxTokens,
+    ReasoningEffort? reasoningEffort,
     String? systemPrompt,
     SaveInterval? saveInterval,
     String? modelStoragePath,
@@ -177,6 +182,7 @@ Available variables: {user_name}, {current_time}.
     temperature: temperature ?? this.temperature,
     topP: topP ?? this.topP,
     maxTokens: maxTokens ?? this.maxTokens,
+    reasoningEffort: reasoningEffort ?? this.reasoningEffort,
     systemPrompt: systemPrompt ?? this.systemPrompt,
     saveInterval: saveInterval ?? this.saveInterval,
     modelStoragePath: clearModelStoragePath
@@ -216,6 +222,7 @@ Available variables: {user_name}, {current_time}.
     'temperature': temperature,
     'topP': topP,
     'maxTokens': maxTokens,
+    'reasoningEffort': reasoningEffort.name,
     'systemPrompt': systemPrompt,
     'saveInterval': saveInterval.name,
     'modelStoragePath': modelStoragePath,
@@ -252,6 +259,9 @@ Available variables: {user_name}, {current_time}.
     temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
     topP: (json['topP'] as num?)?.toDouble() ?? 0.9,
     maxTokens: json['maxTokens'] as int? ?? 4096,
+    reasoningEffort: ReasoningEffort.values.byName(
+      json['reasoningEffort'] as String? ?? 'medium',
+    ),
     systemPrompt:
         json['systemPrompt'] as String? ?? AppSettings.defaultSystemPrompt,
     saveInterval: SaveInterval.values.byName(
@@ -469,11 +479,11 @@ class ApiProfile {
     required this.isMultimodal,
     this.notes = '',
     this.modelMappings = const {},
+    this.reasoningModelIds = const {},
     this.fallbackModelId = '',
     this.billingCurrency = '',
     this.inputPricePerMillion,
     this.outputPricePerMillion,
-    this.headers = const {},
     this.lastTestedAt,
     this.inputTokens = 0,
     this.outputTokens = 0,
@@ -488,11 +498,11 @@ class ApiProfile {
   final bool isMultimodal;
   final String notes;
   final Map<String, String> modelMappings;
+  final Set<String> reasoningModelIds;
   final String fallbackModelId;
   final String billingCurrency;
   final double? inputPricePerMillion;
   final double? outputPricePerMillion;
-  final Map<String, String> headers;
   final DateTime? lastTestedAt;
   final int inputTokens;
   final int outputTokens;
@@ -513,6 +523,9 @@ class ApiProfile {
     if (alias == null || alias.isEmpty) return defaultModelId;
     return modelMappings[alias] ?? alias;
   }
+
+  bool supportsReasoning(String? alias) =>
+      reasoningModelIds.contains(resolveModel(alias));
 
   TokenUsage applyBilling(TokenUsage usage) {
     final inputPrice = inputPricePerMillion;
@@ -543,11 +556,14 @@ class ApiProfile {
     'is_multimodal': isMultimodal ? 1 : 0,
     'notes': notes,
     'model_mappings_json': jsonEncode(modelMappings),
+    'reasoning_model_ids_json': jsonEncode(reasoningModelIds.toList()),
     'fallback_model_id': fallbackModelId,
     'billing_currency': billingCurrency,
     'input_price_per_million': inputPricePerMillion,
     'output_price_per_million': outputPricePerMillion,
-    'headers_json': jsonEncode(headers),
+    // Kept in the database schema for in-place upgrades. User supplied
+    // headers are intentionally discarded from Beta1 build 4006 onward.
+    'headers_json': '{}',
     'last_tested_at': lastTestedAt?.millisecondsSinceEpoch,
     'input_tokens': inputTokens,
     'output_tokens': outputTokens,
@@ -566,14 +582,15 @@ class ApiProfile {
     modelMappings: Map<String, String>.from(
       jsonDecode(map['model_mappings_json'] as String? ?? '{}') as Map,
     ),
+    reasoningModelIds: Set<String>.from(
+      (jsonDecode(map['reasoning_model_ids_json'] as String? ?? '[]') as List)
+          .whereType<String>(),
+    ),
     fallbackModelId: map['fallback_model_id'] as String? ?? '',
     billingCurrency: map['billing_currency'] as String? ?? '',
     inputPricePerMillion: (map['input_price_per_million'] as num?)?.toDouble(),
     outputPricePerMillion: (map['output_price_per_million'] as num?)
         ?.toDouble(),
-    headers: Map<String, String>.from(
-      jsonDecode(map['headers_json']! as String) as Map,
-    ),
     lastTestedAt: map['last_tested_at'] == null
         ? null
         : DateTime.fromMillisecondsSinceEpoch(map['last_tested_at']! as int),

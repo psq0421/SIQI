@@ -1022,7 +1022,7 @@ abstract class AppLocalizations {
   /// No description provided for @manageProviders.
   ///
   /// In zh, this message translates to:
-  /// **'管理厂商、兼容格式与自定义 Headers'**
+  /// **'管理供应商并自动获取可用模型'**
   String get manageProviders;
 
   /// No description provided for @quotaStatistics.
@@ -1144,18 +1144,6 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'支持多模态'**
   String get multimodal;
-
-  /// No description provided for @customHeaders.
-  ///
-  /// In zh, this message translates to:
-  /// **'自定义 Headers'**
-  String get customHeaders;
-
-  /// No description provided for @headersHint.
-  ///
-  /// In zh, this message translates to:
-  /// **'例如：\'{\"X-Custom\":\"value\"}\''**
-  String get headersHint;
 
   /// No description provided for @testConnection.
   ///
@@ -3274,6 +3262,84 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'{count} 个模型'**
   String configuredModelCount(int count);
+
+  /// No description provided for @fetchModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'获取模型列表'**
+  String get fetchModels;
+
+  /// No description provided for @fetchingModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在获取模型…'**
+  String get fetchingModels;
+
+  /// No description provided for @modelListFromBaseUrl.
+  ///
+  /// In zh, this message translates to:
+  /// **'模型将从 Base URL 自动读取，无需手动填写模型 ID。'**
+  String get modelListFromBaseUrl;
+
+  /// No description provided for @selectModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'可用模型'**
+  String get selectModels;
+
+  /// No description provided for @modelsFetched.
+  ///
+  /// In zh, this message translates to:
+  /// **'已获取 {count} 个模型'**
+  String modelsFetched(int count);
+
+  /// No description provided for @reasoningCapableModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'支持思考的模型'**
+  String get reasoningCapableModels;
+
+  /// No description provided for @reasoningEffort.
+  ///
+  /// In zh, this message translates to:
+  /// **'思考强度'**
+  String get reasoningEffort;
+
+  /// No description provided for @reasoningEffortDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅对已标记为支持思考的模型生效。'**
+  String get reasoningEffortDescription;
+
+  /// No description provided for @reasoningOff.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭'**
+  String get reasoningOff;
+
+  /// No description provided for @reasoningLow.
+  ///
+  /// In zh, this message translates to:
+  /// **'低'**
+  String get reasoningLow;
+
+  /// No description provided for @reasoningMedium.
+  ///
+  /// In zh, this message translates to:
+  /// **'中'**
+  String get reasoningMedium;
+
+  /// No description provided for @reasoningHigh.
+  ///
+  /// In zh, this message translates to:
+  /// **'高'**
+  String get reasoningHigh;
+
+  /// No description provided for @modelFilesDetected.
+  ///
+  /// In zh, this message translates to:
+  /// **'已检测到模型文件'**
+  String get modelFilesDetected;
 }
 
 class _AppLocalizationsDelegate

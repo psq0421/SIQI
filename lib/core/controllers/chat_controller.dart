@@ -522,6 +522,7 @@ class ChatController extends StateNotifier<ChatState> {
         temperature: settings.temperature,
         topP: settings.topP,
         maxTokens: settings.maxTokens,
+        reasoningEffort: settings.reasoningEffort,
         modelId: modelAlias,
         cancelToken: _cancelToken,
       );
@@ -536,6 +537,7 @@ class ChatController extends StateNotifier<ChatState> {
       temperature: settings.temperature,
       topP: settings.topP,
       maxTokens: settings.maxTokens,
+      reasoningEffort: settings.reasoningEffort,
       modelId: modelAlias,
       cancelToken: _cancelToken,
     )) {

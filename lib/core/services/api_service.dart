@@ -8,6 +8,46 @@ class ApiService {
   const ApiService(this._dio);
   final Dio _dio;
 
+  Future<List<String>> fetchModels({
+    required String baseUrl,
+    required ApiFormat format,
+    required String apiKey,
+  }) async {
+    final response = await _dio.get<Object?>(
+      _join(baseUrl, 'models'),
+      options: Options(headers: _authenticationHeaders(format, apiKey)),
+    );
+    final identifiers = <String>{};
+    void collect(Object? value) {
+      if (value is String && value.trim().isNotEmpty) {
+        identifiers.add(value.trim());
+      } else if (value is Map) {
+        final identifier = value['id'] ?? value['model'] ?? value['name'];
+        if (identifier is String && identifier.trim().isNotEmpty) {
+          identifiers.add(identifier.trim());
+        }
+      }
+    }
+
+    final rawBody = response.data;
+    final body = rawBody is String ? jsonDecode(rawBody) : rawBody;
+    if (body is List) {
+      for (final item in body) {
+        collect(item);
+      }
+    } else if (body is Map) {
+      final items = body['data'] ?? body['models'] ?? body['items'];
+      if (items is List) {
+        for (final item in items) {
+          collect(item);
+        }
+      }
+    }
+    final models = identifiers.toList()..sort();
+    if (models.isEmpty) throw const FormatException('model-list-empty');
+    return models;
+  }
+
   Stream<CompletionChunk> streamComplete({
     required ApiProfile profile,
     required String apiKey,
@@ -16,6 +56,7 @@ class ApiService {
     required double temperature,
     required double topP,
     required int maxTokens,
+    required ReasoningEffort reasoningEffort,
     String? modelId,
     CancelToken? cancelToken,
   }) async* {
@@ -24,6 +65,12 @@ class ApiService {
     }
     final openAi = profile.format == ApiFormat.openAi;
     final selectedModelId = profile.resolveModel(modelId);
+    final reasoning = _reasoningFields(
+      profile: profile,
+      modelId: selectedModelId,
+      effort: reasoningEffort,
+      maxTokens: maxTokens,
+    );
     final endpoint = _join(
       profile.baseUrl,
       openAi ? 'chat/completions' : 'messages',
@@ -44,11 +91,12 @@ class ApiService {
                     },
                   ),
             ],
-            'temperature': temperature,
-            'top_p': topP,
+            if (reasoning.isEmpty) 'temperature': temperature,
+            if (reasoning.isEmpty) 'top_p': topP,
             'max_tokens': maxTokens,
             'stream': true,
             'stream_options': {'include_usage': true},
+            ...reasoning,
           }
         : <String, Object?>{
             'model': selectedModelId,
@@ -64,23 +112,13 @@ class ApiService {
                   },
                 )
                 .toList(),
-            'temperature': temperature,
-            'top_p': topP,
+            if (reasoning.isEmpty) 'temperature': temperature,
+            if (reasoning.isEmpty) 'top_p': topP,
             'max_tokens': maxTokens,
             'stream': true,
+            ...reasoning,
           };
-    final headers = openAi
-        ? <String, String>{
-            if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
-            'Content-Type': 'application/json',
-            ...profile.headers,
-          }
-        : <String, String>{
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-            'Content-Type': 'application/json',
-            ...profile.headers,
-          };
+    final headers = _authenticationHeaders(profile.format, apiKey);
     final response = await _dio.post<ResponseBody>(
       endpoint,
       data: data,
@@ -167,6 +205,7 @@ class ApiService {
         temperature: 0,
         topP: 1,
         maxTokens: 8,
+        reasoningEffort: ReasoningEffort.off,
       );
 
   Future<CompletionResult> complete({
@@ -177,6 +216,7 @@ class ApiService {
     required double temperature,
     required double topP,
     required int maxTokens,
+    required ReasoningEffort reasoningEffort,
     String? modelId,
     CancelToken? cancelToken,
   }) async {
@@ -189,6 +229,7 @@ class ApiService {
         temperature,
         topP,
         maxTokens,
+        reasoningEffort,
         profile.resolveModel(modelId),
         cancelToken,
       ),
@@ -200,6 +241,7 @@ class ApiService {
         temperature,
         topP,
         maxTokens,
+        reasoningEffort,
         profile.resolveModel(modelId),
         cancelToken,
       ),
@@ -217,10 +259,17 @@ class ApiService {
     double temperature,
     double topP,
     int maxTokens,
+    ReasoningEffort reasoningEffort,
     String modelId,
     CancelToken? cancelToken,
   ) async {
     final endpoint = _join(profile.baseUrl, 'chat/completions');
+    final reasoning = _reasoningFields(
+      profile: profile,
+      modelId: modelId,
+      effort: reasoningEffort,
+      maxTokens: maxTokens,
+    );
     final response = await _dio.post<Map<String, dynamic>>(
       endpoint,
       data: {
@@ -238,17 +287,12 @@ class ApiService {
                 },
               ),
         ],
-        'temperature': temperature,
-        'top_p': topP,
+        if (reasoning.isEmpty) 'temperature': temperature,
+        if (reasoning.isEmpty) 'top_p': topP,
         'max_tokens': maxTokens,
+        ...reasoning,
       },
-      options: Options(
-        headers: {
-          if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
-          'Content-Type': 'application/json',
-          ...profile.headers,
-        },
-      ),
+      options: Options(headers: _authenticationHeaders(profile.format, apiKey)),
       cancelToken: cancelToken,
     );
     final data = response.data ?? const {};
@@ -311,10 +355,17 @@ class ApiService {
     double temperature,
     double topP,
     int maxTokens,
+    ReasoningEffort reasoningEffort,
     String modelId,
     CancelToken? cancelToken,
   ) async {
     final endpoint = _join(profile.baseUrl, 'messages');
+    final reasoning = _reasoningFields(
+      profile: profile,
+      modelId: modelId,
+      effort: reasoningEffort,
+      maxTokens: maxTokens,
+    );
     final response = await _dio.post<Map<String, dynamic>>(
       endpoint,
       data: {
@@ -331,18 +382,12 @@ class ApiService {
               },
             )
             .toList(),
-        'temperature': temperature,
-        'top_p': topP,
+        if (reasoning.isEmpty) 'temperature': temperature,
+        if (reasoning.isEmpty) 'top_p': topP,
         'max_tokens': maxTokens,
+        ...reasoning,
       },
-      options: Options(
-        headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'Content-Type': 'application/json',
-          ...profile.headers,
-        },
-      ),
+      options: Options(headers: _authenticationHeaders(profile.format, apiKey)),
       cancelToken: cancelToken,
     );
     final data = response.data ?? const {};
@@ -384,6 +429,50 @@ class ApiService {
           'text': '${attachment.name}\n${attachment.extractedText ?? ''}',
         },
   ];
+
+  Map<String, String> _authenticationHeaders(ApiFormat format, String apiKey) =>
+      switch (format) {
+        ApiFormat.openAi => {
+          if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        ApiFormat.anthropic => {
+          if (apiKey.isNotEmpty) 'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'Content-Type': 'application/json',
+        },
+        ApiFormat.local => const {},
+      };
+
+  Map<String, Object?> _reasoningFields({
+    required ApiProfile profile,
+    required String modelId,
+    required ReasoningEffort effort,
+    required int maxTokens,
+  }) {
+    if (effort == ReasoningEffort.off ||
+        !profile.reasoningModelIds.contains(modelId)) {
+      return const {};
+    }
+    if (profile.format == ApiFormat.openAi) {
+      return {'reasoning_effort': effort.name};
+    }
+    if (profile.format == ApiFormat.anthropic && maxTokens >= 2048) {
+      final requested = switch (effort) {
+        ReasoningEffort.low => 1024,
+        ReasoningEffort.medium => 4096,
+        ReasoningEffort.high => 8192,
+        ReasoningEffort.off => 0,
+      };
+      return {
+        'thinking': {
+          'type': 'enabled',
+          'budget_tokens': requested.clamp(1024, maxTokens - 1),
+        },
+      };
+    }
+    return const {};
+  }
 
   String _join(String base, String path) =>
       '${base.replaceAll(RegExp(r'/+$'), '')}/${path.replaceAll(RegExp(r'^/+'), '')}';

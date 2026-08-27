@@ -23,7 +23,7 @@ Source license: MIT License
 - A fresh install creates app-specific `Projects`, `Models`, `Exports`, `Logs`, and `Cache` directories and initializes workspace/model paths to locations that are immediately writable, fixing the first-run false “folder not writable” result.
 - Permissions now include legacy file read/write and optional all-files access. The latter opens Android's dedicated settings page only after an explicit user action; it is never forced at startup. Root remains unsupported.
 - The physical-memory guard for local inference, TTS, and ASR is raised from 60% to 85%.
-- One API-key profile can expose multiple model mappings and now supports notes, a fallback model, endpoint, custom headers, and optional input/output token pricing.
+- One API-key profile can expose multiple models. The app now discovers them from the Base URL and supports notes, a fallback model, reasoning capability flags, reasoning strength, and optional input/output token pricing.
 
 ## Implemented features
 
