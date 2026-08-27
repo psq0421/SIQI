@@ -127,6 +127,16 @@ class _ConversationSettingsPageState
                 ? null
                 : update((current) => current.copyWith(maxTokens: value)),
           ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: Text(
+              context.l10n.localInferenceLimitsHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
           const SizedBox(height: 12),
           _DeferredSlider(
             label: context.l10n.temperature,

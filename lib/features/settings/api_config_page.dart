@@ -70,6 +70,11 @@ class ApiConfigPage extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(profile.modelId),
+                          Text(
+                            context.l10n.configuredModelCount(
+                              profile.selectableModels.length,
+                            ),
+                          ),
                           const SizedBox(height: 3),
                           Text(
                             profile.lastTestedAt == null
@@ -139,6 +144,11 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
   late final TextEditingController _model;
   late final TextEditingController _apiKey;
   late final TextEditingController _headers;
+  late final TextEditingController _notes;
+  late final TextEditingController _mappings;
+  late final TextEditingController _currency;
+  late final TextEditingController _inputPrice;
+  late final TextEditingController _outputPrice;
   late String _templateId;
   late ApiFormat _format;
   late bool _multimodal;
@@ -157,12 +167,27 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     _baseUrl = TextEditingController(
       text: profile?.baseUrl ?? initialTemplate.baseUrl,
     );
-    _model = TextEditingController(text: profile?.modelId ?? '');
+    _model = TextEditingController(text: profile?.defaultModelId ?? '');
     _apiKey = TextEditingController();
     _headers = TextEditingController(
       text: const JsonEncoder.withIndent(
         '  ',
       ).convert(profile?.headers ?? const <String, String>{}),
+    );
+    _notes = TextEditingController(text: profile?.notes ?? '');
+    _mappings = TextEditingController(
+      text:
+          profile?.modelMappings.entries
+              .map((entry) => '${entry.key} = ${entry.value}')
+              .join('\n') ??
+          '',
+    );
+    _currency = TextEditingController(text: profile?.billingCurrency ?? '');
+    _inputPrice = TextEditingController(
+      text: profile?.inputPricePerMillion?.toString() ?? '',
+    );
+    _outputPrice = TextEditingController(
+      text: profile?.outputPricePerMillion?.toString() ?? '',
     );
     _templateId = profile?.providerId ?? initialTemplate.id;
     _format = profile?.format ?? initialTemplate.format;
@@ -176,6 +201,11 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     _model.dispose();
     _apiKey.dispose();
     _headers.dispose();
+    _notes.dispose();
+    _mappings.dispose();
+    _currency.dispose();
+    _inputPrice.dispose();
+    _outputPrice.dispose();
     super.dispose();
   }
 
@@ -209,10 +239,38 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
     }
   }
 
+  Map<String, String>? _parseMappings() {
+    final result = <String, String>{};
+    for (final rawLine in const LineSplitter().convert(_mappings.text)) {
+      final line = rawLine.trim();
+      if (line.isEmpty) continue;
+      final separator = line.indexOf('=');
+      if (separator <= 0 || separator == line.length - 1) return null;
+      final alias = line.substring(0, separator).trim();
+      final upstream = line.substring(separator + 1).trim();
+      if (alias.isEmpty || upstream.isEmpty) return null;
+      result[alias] = upstream;
+    }
+    return result;
+  }
+
+  double? _optionalPrice(TextEditingController controller) {
+    final value = controller.text.trim();
+    return value.isEmpty ? null : double.tryParse(value);
+  }
+
   ApiProfile? _build({DateTime? testedAt}) {
     final headers = _parseHeaders();
-    if (headers == null) {
+    final mappings = _parseMappings();
+    final inputPrice = _optionalPrice(_inputPrice);
+    final outputPrice = _optionalPrice(_outputPrice);
+    if (headers == null || mappings == null) {
       setState(() => _error = context.l10n.invalidJson);
+      return null;
+    }
+    if ((_inputPrice.text.trim().isNotEmpty && inputPrice == null) ||
+        (_outputPrice.text.trim().isNotEmpty && outputPrice == null)) {
+      setState(() => _error = context.l10n.requiredField);
       return null;
     }
     if (_name.text.trim().isEmpty ||
@@ -230,6 +288,12 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
       modelId: _model.text.trim(),
       format: _format,
       isMultimodal: _multimodal,
+      notes: _notes.text.trim(),
+      modelMappings: mappings,
+      fallbackModelId: _model.text.trim(),
+      billingCurrency: _currency.text.trim(),
+      inputPricePerMillion: inputPrice,
+      outputPricePerMillion: outputPrice,
       headers: headers,
       lastTestedAt: testedAt ?? existing?.lastTestedAt,
       inputTokens: existing?.inputTokens ?? 0,
@@ -275,6 +339,12 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
         modelId: profile.modelId,
         format: profile.format,
         isMultimodal: profile.isMultimodal,
+        notes: profile.notes,
+        modelMappings: profile.modelMappings,
+        fallbackModelId: profile.fallbackModelId,
+        billingCurrency: profile.billingCurrency,
+        inputPricePerMillion: profile.inputPricePerMillion,
+        outputPricePerMillion: profile.outputPricePerMillion,
         headers: profile.headers,
         lastTestedAt: DateTime.now(),
         inputTokens: profile.inputTokens,
@@ -362,6 +432,14 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
               ),
               const SizedBox(height: 10),
               TextField(
+                controller: _notes,
+                decoration: InputDecoration(
+                  labelText: context.l10n.providerNotes,
+                  hintText: context.l10n.providerNotesHint,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
                 controller: _baseUrl,
                 keyboardType: TextInputType.url,
                 decoration: InputDecoration(labelText: context.l10n.baseUrl),
@@ -369,7 +447,20 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
               const SizedBox(height: 10),
               TextField(
                 controller: _model,
-                decoration: InputDecoration(labelText: context.l10n.modelId),
+                decoration: InputDecoration(
+                  labelText: context.l10n.fallbackModel,
+                  hintText: context.l10n.fallbackModelHint,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _mappings,
+                minLines: 3,
+                maxLines: 8,
+                decoration: InputDecoration(
+                  labelText: context.l10n.modelMappings,
+                  hintText: context.l10n.modelMappingsHint,
+                ),
               ),
               const SizedBox(height: 10),
               TextField(
@@ -414,6 +505,47 @@ class _ApiProfileEditorState extends ConsumerState<_ApiProfileEditor> {
                   labelText: context.l10n.customHeaders,
                   hintText: context.l10n.headersHint,
                 ),
+              ),
+              const SizedBox(height: 10),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: Text(context.l10n.billingConfiguration),
+                children: [
+                  TextField(
+                    controller: _currency,
+                    decoration: InputDecoration(
+                      labelText: context.l10n.billingCurrency,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _inputPrice,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: context.l10n.inputPricePerMillion,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: TextField(
+                          controller: _outputPrice,
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
+                          decoration: InputDecoration(
+                            labelText: context.l10n.outputPricePerMillion,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
               if (_error != null)
                 Padding(

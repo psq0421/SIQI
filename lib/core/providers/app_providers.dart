@@ -1,7 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../controllers/chat_controller.dart';
@@ -14,6 +13,7 @@ import '../models/workbench_models.dart';
 import '../services/agent_service.dart';
 import '../services/ai_team_service.dart';
 import '../services/api_service.dart';
+import '../services/asr_service.dart';
 import '../services/app_log_service.dart';
 import '../services/archive_service.dart';
 import '../services/cache_service.dart';
@@ -25,11 +25,13 @@ import '../services/local_inference_service.dart';
 import '../services/model_download_service.dart';
 import '../services/mcp_service.dart';
 import '../services/notification_service.dart';
+import '../services/ocr_service.dart';
 import '../services/permission_service.dart';
 import '../services/preferences_service.dart';
 import '../services/platform_service.dart';
 import '../services/secure_key_service.dart';
 import '../services/shell_service.dart';
+import '../services/tts_service.dart';
 import '../services/workspace_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
@@ -45,16 +47,15 @@ final appLogServiceProvider = Provider<AppLogService>(
   (ref) => throw UnimplementedError(),
 );
 
-@Riverpod(keepAlive: true)
-Dio createDio(Ref ref) => Dio(
-  BaseOptions(
-    connectTimeout: const Duration(seconds: 20),
-    receiveTimeout: const Duration(minutes: 5),
-    sendTimeout: const Duration(minutes: 2),
+final dioProvider = Provider<Dio>(
+  (ref) => Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(minutes: 5),
+      sendTimeout: const Duration(minutes: 2),
+    ),
   ),
 );
-
-final dioProvider = Provider<Dio>(createDio);
 final preferencesServiceProvider = Provider(
   (ref) => PreferencesService(ref.watch(sharedPreferencesProvider)),
 );
@@ -79,6 +80,29 @@ final permissionServiceProvider = Provider(
 );
 final cacheServiceProvider = Provider((ref) => const CacheService());
 final fileContentServiceProvider = Provider((ref) => FileContentService());
+final ttsServiceProvider = Provider((ref) {
+  final service = TtsService(
+    ref.watch(modelDownloadServiceProvider),
+    ref.watch(platformServiceProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+final asrServiceProvider = Provider((ref) {
+  final service = AsrService(
+    ref.watch(modelDownloadServiceProvider),
+    ref.watch(platformServiceProvider),
+  );
+  ref.onDispose(service.dispose);
+  return service;
+});
+final ocrServiceProvider = Provider(
+  (ref) => OcrService(
+    ref.watch(modelDownloadServiceProvider),
+    ref.watch(localInferenceServiceProvider),
+    ref.watch(fileContentServiceProvider),
+  ),
+);
 final archiveServiceProvider = Provider(
   (ref) => ArchiveService(ref.watch(localDatabaseProvider)),
 );
@@ -102,6 +126,7 @@ final agentServiceProvider = Provider(
   (ref) => AgentService(
     ref.watch(workspaceServiceProvider),
     ref.watch(shellServiceProvider),
+    ref.watch(localDatabaseProvider),
   ),
 );
 final aiTeamServiceProvider = Provider(

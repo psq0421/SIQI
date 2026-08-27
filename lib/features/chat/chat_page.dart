@@ -7,12 +7,15 @@ import '../../core/constants/app_constants.dart';
 import '../../core/controllers/chat_controller.dart';
 import '../../core/icons/siqi_icons.dart';
 import '../../core/models/app_models.dart';
+import '../../core/models/privacy_models.dart';
 import '../../core/models/workbench_models.dart';
 import '../../core/providers/app_providers.dart';
+import '../../core/services/local_task_service.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/theme/siqi_design.dart';
 import '../../l10n/l10n.dart';
 import '../../shared/adaptive_top_bar.dart';
+import '../../ui/chat/input_field.dart';
 import 'model_sheet.dart';
 
 class ChatPage extends ConsumerStatefulWidget {
@@ -25,6 +28,10 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  bool _recording = false;
+  bool _transcribing = false;
+  bool _recognizingImage = false;
+  bool _speaking = false;
 
   @override
   void initState() {
@@ -142,6 +149,10 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       return _MessageBubble(
                         message: chat.messages[index],
                         settings: settings,
+                        onReadAloud:
+                            chat.messages[index].role == MessageRole.assistant
+                            ? () => _readAloud(chat.messages[index].content)
+                            : null,
                       );
                     }
                     if (chat.sending && index == chat.messages.length) {
@@ -151,16 +162,24 @@ class _ChatPageState extends ConsumerState<ChatPage> {
                       envelope: chat.agentEnvelope!,
                       results: chat.agentResults,
                       confirmMutations: settings.confirmAgentWrites,
+                      rollingBack: chat.rollingBack,
+                      rollbackComplete: chat.rollbackComplete,
                     );
                   },
                 ),
         ),
-        _Composer(
+        ChatInputField(
           controller: _messageController,
           attachments: chat.attachments,
           multimodal: modelInfo.multimodal,
           sending: chat.sending,
+          cancelling: chat.cancelling,
+          recording: _recording,
+          transcribing: _transcribing,
+          recognizingImage: _recognizingImage,
           onAttach: () => _attach(modelInfo.multimodal),
+          onVoice: _toggleVoiceInput,
+          onOcr: _recognizeScreenshot,
           onRemove: ref.read(chatProvider.notifier).removeAttachment,
           onSend: _send,
           onStop: ref.read(chatProvider.notifier).cancel,
@@ -168,22 +187,16 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       ],
     );
 
-    return Stack(
-      children: [
-        LayoutBuilder(
-          builder: (context, constraints) => constraints.maxWidth >= 1080
-              ? Row(
-                  children: [
-                    const SizedBox(width: 304, child: _HistoryPanel()),
-                    const VerticalDivider(width: 1),
-                    Expanded(child: conversation),
-                  ],
-                )
-              : conversation,
-        ),
-        if (chat.slow)
-          _SlowTaskOverlay(onStop: ref.read(chatProvider.notifier).cancel),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) => constraints.maxWidth >= 1080
+          ? Row(
+              children: [
+                const SizedBox(width: 304, child: _HistoryPanel()),
+                const VerticalDivider(width: 1),
+                Expanded(child: conversation),
+              ],
+            )
+          : conversation,
     );
   }
 
@@ -198,6 +211,14 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       final files = await ref
           .read(fileContentServiceProvider)
           .pick(multimodal: true);
+      await ref
+          .read(permissionServiceProvider)
+          .recordSystemPicker(
+            kind: AppPermissionKind.photos,
+            purpose: PermissionPurpose.imageAttachment,
+            granted: files.isNotEmpty,
+            detail: files.map((file) => file.name).join(', '),
+          );
       ref.read(chatProvider.notifier).addAttachments(files);
     } on Object catch (error) {
       if (mounted) {
@@ -208,6 +229,149 @@ class _ChatPageState extends ConsumerState<ChatPage> {
         );
       }
     }
+  }
+
+  Future<void> _toggleVoiceInput() async {
+    final service = ref.read(asrServiceProvider);
+    if (_recording) {
+      setState(() {
+        _recording = false;
+        _transcribing = true;
+      });
+      try {
+        final path = await service.stopRecording();
+        if (path == null) return;
+        final model = await _installedTaskModel(ModelTask.speechRecognition);
+        if (model == null) {
+          throw const LocalTaskException('asr-model-not-installed');
+        }
+        final result = await service.transcribe(model: model, audioPath: path);
+        if (!mounted) return;
+        _insertComposerText(result.text);
+      } on Object catch (error) {
+        _showLocalTaskError(error);
+      } finally {
+        if (mounted) setState(() => _transcribing = false);
+      }
+      return;
+    }
+
+    final model = await _installedTaskModel(ModelTask.speechRecognition);
+    if (model == null) {
+      _showLocalTaskError(const LocalTaskException('asr-model-not-installed'));
+      return;
+    }
+    final decision = await ref
+        .read(permissionServiceProvider)
+        .request(
+          AppPermissionKind.microphone,
+          PermissionPurpose.speechToText,
+          detail: model.id,
+        );
+    if (decision != PermissionDecision.granted) {
+      _showLocalTaskError(const LocalTaskException('microphone-denied'));
+      return;
+    }
+    try {
+      await service.startRecording();
+      if (mounted) setState(() => _recording = true);
+    } on Object catch (error) {
+      _showLocalTaskError(error);
+    }
+  }
+
+  Future<void> _recognizeScreenshot() async {
+    final path = await ref.read(fileContentServiceProvider).pickImageForOcr();
+    await ref
+        .read(permissionServiceProvider)
+        .recordSystemPicker(
+          kind: AppPermissionKind.photos,
+          purpose: PermissionPurpose.imageAttachment,
+          granted: path != null,
+          detail: path,
+        );
+    if (path == null || !mounted) return;
+    setState(() => _recognizingImage = true);
+    try {
+      final result = await ref
+          .read(ocrServiceProvider)
+          .recognize(imagePath: path, settings: ref.read(settingsProvider));
+      if (!mounted) return;
+      _insertComposerText(result.text);
+    } on Object catch (error) {
+      _showLocalTaskError(error);
+    } finally {
+      if (mounted) setState(() => _recognizingImage = false);
+    }
+  }
+
+  Future<void> _readAloud(String text) async {
+    if (_speaking) {
+      await ref.read(ttsServiceProvider).stop();
+      if (mounted) setState(() => _speaking = false);
+      return;
+    }
+    final model = await _installedTaskModel(ModelTask.speechSynthesis);
+    if (model == null) {
+      _showLocalTaskError(const LocalTaskException('tts-model-not-installed'));
+      return;
+    }
+    setState(() => _speaking = true);
+    try {
+      await ref.read(ttsServiceProvider).speak(model: model, text: text);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.speechPlaybackStarted)),
+        );
+      }
+    } on Object catch (error) {
+      _showLocalTaskError(error);
+    } finally {
+      if (mounted) setState(() => _speaking = false);
+    }
+  }
+
+  Future<ModelDefinition?> _installedTaskModel(ModelTask task) async {
+    for (final model in ModelCatalog.models.where(
+      (item) => item.task == task && item.runnable,
+    )) {
+      if (await ref
+          .read(modelDownloadServiceProvider)
+          .isFullyInstalled(model)) {
+        return model;
+      }
+    }
+    return null;
+  }
+
+  void _insertComposerText(String value) {
+    final normalized = value.trim();
+    if (normalized.isEmpty) return;
+    final current = _messageController.text.trimRight();
+    _messageController.text = current.isEmpty
+        ? normalized
+        : '$current\n$normalized';
+    _messageController.selection = TextSelection.collapsed(
+      offset: _messageController.text.length,
+    );
+  }
+
+  void _showLocalTaskError(Object error) {
+    if (!mounted) return;
+    final code = error is LocalTaskException ? error.code : 'unknown';
+    final message = switch (code) {
+      'asr-model-not-installed' => context.l10n.asrModelRequired,
+      'tts-model-not-installed' => context.l10n.ttsModelRequired,
+      'vision-model-not-installed' => context.l10n.ocrModelRequired,
+      'microphone-denied' => context.l10n.microphonePermissionDenied,
+      'audio-too-long' => context.l10n.audioMaximumDuration,
+      'insufficient-memory' => context.l10n.errorMemory,
+      'text-too-long' => context.l10n.ttsTextTooLong,
+      _ => context.l10n.localFeatureFailed(error.toString()),
+    };
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _selectMode(ChatMode mode) async {
@@ -244,14 +408,17 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           .read(chatProvider)
           .profiles
           .where(
-            (item) => item.id == profileId && item.providerId == 'deepseek',
+            (item) =>
+                item.id == profileId &&
+                item.format != ApiFormat.local &&
+                item.isDeepSeekProfile,
           )
           .firstOrNull;
       if (profile != null) {
         harnessModelId = 'custom:${profile.id}';
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.errorHarnessDeepSeekRequired)),
+          SnackBar(content: Text(context.l10n.errorHarnessProfileRequired)),
         );
       }
     }
@@ -521,82 +688,105 @@ class _EmptyConversation extends StatelessWidget {
 }
 
 class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.message, required this.settings});
+  const _MessageBubble({
+    required this.message,
+    required this.settings,
+    this.onReadAloud,
+  });
   final ChatMessage message;
   final AppSettings settings;
+  final VoidCallback? onReadAloud;
   @override
   Widget build(BuildContext context) {
     final isUser = message.role == MessageRole.user;
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 760),
-        margin: EdgeInsets.only(bottom: settings.messageSpacing),
-        padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
-        decoration: BoxDecoration(
-          color: isUser
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Theme.of(context).colorScheme.surfaceContainerHigh,
-          borderRadius: BorderRadius.circular(SiqiRadius.surface),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SiqiIcon(
-                  isUser ? SiqiGlyph.user : SiqiGlyph.brand,
-                  size: 15,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  isUser ? context.l10n.roleYou : context.l10n.appName,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
+      child: GestureDetector(
+        onLongPress: onReadAloud == null
+            ? null
+            : () => showModalBottomSheet<void>(
+                context: context,
+                builder: (sheetContext) => SafeArea(
+                  child: ListTile(
+                    leading: const SiqiIcon(SiqiGlyph.play),
+                    title: Text(context.l10n.readAloud),
+                    subtitle: Text(context.l10n.localTtsReadAloud),
+                    onTap: () {
+                      Navigator.pop(sheetContext);
+                      onReadAloud?.call();
+                    },
                   ),
                 ),
-              ],
+              ),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 760),
+          margin: EdgeInsets.only(bottom: settings.messageSpacing),
+          padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+          decoration: BoxDecoration(
+            color: isUser
+                ? Theme.of(context).colorScheme.primaryContainer
+                : Theme.of(context).colorScheme.surfaceContainerHigh,
+            borderRadius: BorderRadius.circular(SiqiRadius.surface),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
-            if (message.attachments.isNotEmpty) ...[
-              const SizedBox(height: 7),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: message.attachments
-                    .map(
-                      (attachment) => Chip(
-                        avatar: SiqiIcon(
-                          _attachmentGlyph(attachment),
-                          size: 16,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SiqiIcon(
+                    isUser ? SiqiGlyph.user : SiqiGlyph.brand,
+                    size: 15,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    isUser ? context.l10n.roleYou : context.l10n.appName,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+              if (message.attachments.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: message.attachments
+                      .map(
+                        (attachment) => Chip(
+                          avatar: SiqiIcon(
+                            _attachmentGlyph(attachment),
+                            size: 16,
+                          ),
+                          label: Text(attachment.name),
                         ),
-                        label: Text(attachment.name),
-                      ),
-                    )
-                    .toList(),
+                      )
+                      .toList(),
+                ),
+              ],
+              const SizedBox(height: 6),
+              SelectableText(message.content),
+              const SizedBox(height: 5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  _formatTime(
+                    context,
+                    message.createdAt,
+                    settings.timestampStyle,
+                  ),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ],
-            const SizedBox(height: 6),
-            SelectableText(message.content),
-            const SizedBox(height: 5),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                _formatTime(
-                  context,
-                  message.createdAt,
-                  settings.timestampStyle,
-                ),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -655,13 +845,20 @@ class _AgentApprovalPanel extends ConsumerWidget {
     required this.envelope,
     required this.results,
     required this.confirmMutations,
+    required this.rollingBack,
+    required this.rollbackComplete,
   });
   final AgentEnvelope envelope;
   final List<AgentActionResult> results;
   final bool confirmMutations;
+  final bool rollingBack;
+  final bool rollbackComplete;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final pending = results.isEmpty;
+    final canRollback = results.any(
+      (result) => result.success && result.action.mutatesWorkspace,
+    );
     return Card(
       margin: const EdgeInsets.only(top: 4, bottom: 14),
       child: Padding(
@@ -754,12 +951,56 @@ class _AgentApprovalPanel extends ConsumerWidget {
               ),
             ] else ...[
               const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: ref.read(chatProvider.notifier).clearAgentActions,
-                  child: Text(context.l10n.done),
-                ),
+              Wrap(
+                alignment: WrapAlignment.end,
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (!rollbackComplete)
+                    FilledButton.tonalIcon(
+                      onPressed: rollingBack
+                          ? null
+                          : () => ref
+                                .read(chatProvider.notifier)
+                                .continueAgentRun(
+                                  instruction: context.l10n.agentResultsPrompt,
+                                  conversationTitle:
+                                      context.l10n.newConversation,
+                                ),
+                      icon: const SiqiIcon(SiqiGlyph.agent, size: 17),
+                      label: Text(context.l10n.continueAgent),
+                    ),
+                  if (canRollback)
+                    OutlinedButton.icon(
+                      onPressed: rollingBack || rollbackComplete
+                          ? null
+                          : () => _confirmRollback(context, ref),
+                      icon: rollingBack
+                          ? const SizedBox.square(
+                              dimension: 15,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : SiqiIcon(
+                              rollbackComplete
+                                  ? SiqiGlyph.check
+                                  : SiqiGlyph.history,
+                              size: 17,
+                            ),
+                      label: Text(
+                        rollingBack
+                            ? context.l10n.rollingBack
+                            : rollbackComplete
+                            ? context.l10n.rollbackComplete
+                            : context.l10n.rollbackChanges,
+                      ),
+                    ),
+                  TextButton(
+                    onPressed: rollingBack
+                        ? null
+                        : ref.read(chatProvider.notifier).clearAgentActions,
+                    child: Text(context.l10n.done),
+                  ),
+                ],
               ),
             ],
           ],
@@ -794,6 +1035,30 @@ class _AgentApprovalPanel extends ConsumerWidget {
     await ref
         .read(chatProvider.notifier)
         .executePendingAgentActions(allowMutations: true);
+  }
+
+  Future<void> _confirmRollback(BuildContext context, WidgetRef ref) async {
+    final accepted = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const SiqiIcon(SiqiGlyph.history, size: 34),
+        title: Text(context.l10n.rollbackTitle),
+        content: Text(context.l10n.rollbackBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.rollbackChanges),
+          ),
+        ],
+      ),
+    );
+    if (accepted == true) {
+      await ref.read(chatProvider.notifier).rollbackLastAgentExecution();
+    }
   }
 }
 
@@ -890,137 +1155,6 @@ class _AgentActionTile extends StatelessWidget {
   }
 }
 
-class _Composer extends StatelessWidget {
-  const _Composer({
-    required this.controller,
-    required this.attachments,
-    required this.multimodal,
-    required this.sending,
-    required this.onAttach,
-    required this.onRemove,
-    required this.onSend,
-    required this.onStop,
-  });
-  final TextEditingController controller;
-  final List<AppAttachment> attachments;
-  final bool multimodal;
-  final bool sending;
-  final VoidCallback onAttach;
-  final ValueChanged<AppAttachment> onRemove;
-  final VoidCallback onSend;
-  final VoidCallback onStop;
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    top: false,
-    child: Padding(
-      padding: const EdgeInsets.fromLTRB(10, 5, 10, 10),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (attachments.isNotEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Wrap(
-                spacing: 6,
-                children: attachments
-                    .map(
-                      (attachment) => InputChip(
-                        avatar: SiqiIcon(
-                          _attachmentGlyph(attachment),
-                          size: 15,
-                        ),
-                        label: Text(attachment.name),
-                        onDeleted: () => onRemove(attachment),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              IconButton(
-                tooltip: context.l10n.attach,
-                color: multimodal
-                    ? Theme.of(context).colorScheme.primary
-                    : Theme.of(context).disabledColor,
-                onPressed: onAttach,
-                icon: const SiqiIcon(SiqiGlyph.add),
-              ),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  minLines: 1,
-                  maxLines: 6,
-                  textInputAction: TextInputAction.newline,
-                  decoration: InputDecoration(
-                    hintText: context.l10n.messageHint,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
-              IconButton.filled(
-                tooltip: sending ? context.l10n.stop : context.l10n.send,
-                onPressed: sending
-                    ? onStop
-                    : (controller.text.trim().isEmpty ? null : onSend),
-                icon: SiqiIcon(
-                  sending ? SiqiGlyph.stop : SiqiGlyph.send,
-                  color: Theme.of(context).colorScheme.onPrimary,
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
-  );
-}
-
-class _SlowTaskOverlay extends StatelessWidget {
-  const _SlowTaskOverlay({required this.onStop});
-  final VoidCallback onStop;
-  @override
-  Widget build(BuildContext context) => Positioned.fill(
-    child: ColoredBox(
-      color: Colors.black54,
-      child: Center(
-        child: Card(
-          margin: const EdgeInsets.all(28),
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const SiqiProgressRing(
-                    value: .72,
-                    child: SiqiIcon(SiqiGlyph.sparkles, size: 18),
-                  ),
-                  const SizedBox(height: 18),
-                  Text(
-                    context.l10n.slowTitle,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(context.l10n.slowBody, textAlign: TextAlign.center),
-                  const SizedBox(height: 18),
-                  FilledButton.tonalIcon(
-                    onPressed: onStop,
-                    icon: const SiqiIcon(SiqiGlyph.stop, size: 18),
-                    label: Text(context.l10n.forceStop),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
-}
-
 ({String name, bool multimodal}) _modelInfo(
   String id,
   List<ApiProfile> profiles,
@@ -1054,7 +1188,7 @@ String? _errorText(BuildContext context, ChatErrorCode? code, String? detail) =>
       ChatErrorCode.requestFailed => context.l10n.errorRequest,
       ChatErrorCode.workspaceRequired => context.l10n.errorWorkspaceRequired,
       ChatErrorCode.harnessDeepSeekRequired =>
-        context.l10n.errorHarnessDeepSeekRequired,
+        context.l10n.errorHarnessProfileRequired,
     };
 
 String _modeName(BuildContext context, ChatMode mode) => switch (mode) {

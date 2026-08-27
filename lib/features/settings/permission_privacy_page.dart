@@ -149,20 +149,45 @@ class _PermissionTile extends ConsumerWidget {
       leading: SiqiIcon(_permissionGlyph(kind)),
       title: Text(_permissionName(context, kind)),
       subtitle: Text(_permissionDescription(context, kind)),
-      trailing: Text(
-        kind == AppPermissionKind.workspaceFolder
-            ? context.l10n.systemPickerManaged
-            : _statusName(context, snapshot.data),
-      ),
+      trailing: kind == AppPermissionKind.workspaceFolder
+          ? Text(context.l10n.systemPickerManaged)
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(_statusName(context, snapshot.data)),
+                const SizedBox(width: 6),
+                const SiqiIcon(SiqiGlyph.chevronRight, size: 16),
+              ],
+            ),
+      onTap: kind == AppPermissionKind.workspaceFolder
+          ? null
+          : () async {
+              await ref
+                  .read(permissionServiceProvider)
+                  .request(kind, _permissionPurpose(kind));
+              ref.invalidate(permissionAuditProvider);
+            },
     ),
   );
 }
+
+PermissionPurpose _permissionPurpose(AppPermissionKind kind) => switch (kind) {
+  AppPermissionKind.notifications => PermissionPurpose.modelDownloadProgress,
+  AppPermissionKind.microphone => PermissionPurpose.speechToText,
+  AppPermissionKind.camera => PermissionPurpose.cameraAttachment,
+  AppPermissionKind.photos => PermissionPurpose.imageAttachment,
+  AppPermissionKind.fileReadWrite ||
+  AppPermissionKind.allFilesAccess => PermissionPurpose.fileAccess,
+  AppPermissionKind.workspaceFolder => PermissionPurpose.workspaceAccess,
+};
 
 SiqiGlyph _permissionGlyph(AppPermissionKind kind) => switch (kind) {
   AppPermissionKind.notifications => SiqiGlyph.warning,
   AppPermissionKind.microphone => SiqiGlyph.audio,
   AppPermissionKind.camera => SiqiGlyph.image,
   AppPermissionKind.photos => SiqiGlyph.image,
+  AppPermissionKind.fileReadWrite => SiqiGlyph.folder,
+  AppPermissionKind.allFilesAccess => SiqiGlyph.storage,
   AppPermissionKind.workspaceFolder => SiqiGlyph.folder,
 };
 
@@ -172,6 +197,8 @@ String _permissionName(BuildContext context, AppPermissionKind kind) =>
       AppPermissionKind.microphone => context.l10n.permissionMicrophone,
       AppPermissionKind.camera => context.l10n.permissionCamera,
       AppPermissionKind.photos => context.l10n.permissionPhotos,
+      AppPermissionKind.fileReadWrite => context.l10n.permissionFileReadWrite,
+      AppPermissionKind.allFilesAccess => context.l10n.permissionAllFilesAccess,
       AppPermissionKind.workspaceFolder => context.l10n.permissionWorkspace,
     };
 
@@ -183,6 +210,10 @@ String _permissionDescription(BuildContext context, AppPermissionKind kind) =>
         context.l10n.permissionMicrophoneDescription,
       AppPermissionKind.camera => context.l10n.permissionCameraDescription,
       AppPermissionKind.photos => context.l10n.permissionPhotosDescription,
+      AppPermissionKind.fileReadWrite =>
+        context.l10n.permissionFileReadWriteDescription,
+      AppPermissionKind.allFilesAccess =>
+        context.l10n.permissionAllFilesAccessDescription,
       AppPermissionKind.workspaceFolder =>
         context.l10n.permissionWorkspaceDescription,
     };
@@ -197,6 +228,7 @@ String _purposeName(
   PermissionPurpose.imageAttachment => context.l10n.purposeImageAttachment,
   PermissionPurpose.workspaceAccess => context.l10n.purposeWorkspace,
   PermissionPurpose.modelStorageAccess => context.l10n.purposeModelStorage,
+  PermissionPurpose.fileAccess => context.l10n.purposeFileAccess,
 };
 
 String _decisionName(BuildContext context, PermissionDecision decision) =>

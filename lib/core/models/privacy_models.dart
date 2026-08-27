@@ -3,6 +3,8 @@ enum AppPermissionKind {
   microphone,
   camera,
   photos,
+  fileReadWrite,
+  allFilesAccess,
   workspaceFolder,
 }
 
@@ -13,6 +15,7 @@ enum PermissionPurpose {
   imageAttachment,
   workspaceAccess,
   modelStorageAccess,
+  fileAccess,
 }
 
 enum PermissionDecision {

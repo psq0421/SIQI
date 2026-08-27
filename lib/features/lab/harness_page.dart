@@ -112,10 +112,10 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
   Widget build(BuildContext context) {
     final workspace = ref.watch(settingsProvider).activeWorkspacePath;
     final settings = ref.watch(settingsProvider);
-    final deepSeekProfiles = ref
+    final harnessProfiles = ref
         .watch(chatProvider)
         .profiles
-        .where((profile) => profile.providerId == 'deepseek')
+        .where((profile) => profile.isDeepSeekProfile)
         .toList();
     final report = _report;
     final issues =
@@ -164,7 +164,7 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
                             ],
                           ),
                           const SizedBox(height: 12),
-                          if (deepSeekProfiles.isEmpty)
+                          if (harnessProfiles.isEmpty)
                             OutlinedButton.icon(
                               onPressed: () => Navigator.of(context).push(
                                 MaterialPageRoute<void>(
@@ -174,12 +174,12 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
                                 ),
                               ),
                               icon: const SiqiIcon(SiqiGlyph.key),
-                              label: Text(context.l10n.addDeepSeekProfile),
+                              label: Text(context.l10n.addHarnessProfile),
                             )
                           else
                             DropdownButtonFormField<String>(
                               initialValue:
-                                  deepSeekProfiles.any(
+                                  harnessProfiles.any(
                                     (profile) =>
                                         profile.id ==
                                         settings.harnessApiProfileId,
@@ -187,13 +187,13 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
                                   ? settings.harnessApiProfileId
                                   : null,
                               decoration: InputDecoration(
-                                labelText: context.l10n.harnessDeepSeekProfile,
+                                labelText: context.l10n.harnessApiProfile,
                                 prefixIcon: const Padding(
                                   padding: EdgeInsets.all(12),
                                   child: SiqiIcon(SiqiGlyph.key),
                                 ),
                               ),
-                              items: deepSeekProfiles
+                              items: harnessProfiles
                                   .map(
                                     (profile) => DropdownMenuItem(
                                       value: profile.id,

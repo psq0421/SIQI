@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:collection/collection.dart';
@@ -35,12 +36,14 @@ class ChatState {
     this.currentSession,
     this.attachments = const [],
     this.sending = false,
-    this.slow = false,
+    this.cancelling = false,
     this.errorCode,
     this.errorDetail,
     this.partialResponse = '',
     this.agentEnvelope,
     this.agentResults = const [],
+    this.rollingBack = false,
+    this.rollbackComplete = false,
   });
   final bool loading;
   final List<ChatSession> sessions;
@@ -49,12 +52,14 @@ class ChatState {
   final ChatSession? currentSession;
   final List<AppAttachment> attachments;
   final bool sending;
-  final bool slow;
+  final bool cancelling;
   final ChatErrorCode? errorCode;
   final String? errorDetail;
   final String partialResponse;
   final AgentEnvelope? agentEnvelope;
   final List<AgentActionResult> agentResults;
+  final bool rollingBack;
+  final bool rollbackComplete;
 
   ChatState copyWith({
     bool? loading,
@@ -65,7 +70,7 @@ class ChatState {
     bool clearCurrentSession = false,
     List<AppAttachment>? attachments,
     bool? sending,
-    bool? slow,
+    bool? cancelling,
     ChatErrorCode? errorCode,
     bool clearError = false,
     String? errorDetail,
@@ -73,6 +78,8 @@ class ChatState {
     AgentEnvelope? agentEnvelope,
     bool clearAgentEnvelope = false,
     List<AgentActionResult>? agentResults,
+    bool? rollingBack,
+    bool? rollbackComplete,
   }) => ChatState(
     loading: loading ?? this.loading,
     sessions: sessions ?? this.sessions,
@@ -83,7 +90,7 @@ class ChatState {
         : currentSession ?? this.currentSession,
     attachments: attachments ?? this.attachments,
     sending: sending ?? this.sending,
-    slow: slow ?? this.slow,
+    cancelling: cancelling ?? this.cancelling,
     errorCode: clearError ? null : errorCode ?? this.errorCode,
     errorDetail: clearError ? null : errorDetail ?? this.errorDetail,
     partialResponse: partialResponse ?? this.partialResponse,
@@ -91,6 +98,8 @@ class ChatState {
         ? null
         : agentEnvelope ?? this.agentEnvelope,
     agentResults: agentResults ?? this.agentResults,
+    rollingBack: rollingBack ?? this.rollingBack,
+    rollbackComplete: rollbackComplete ?? this.rollbackComplete,
   );
 }
 
@@ -123,7 +132,8 @@ class ChatController extends StateNotifier<ChatState> {
   final AppSettings Function() _settings;
   final _uuid = const Uuid();
   CancelToken? _cancelToken;
-  Timer? _slowTimer;
+  bool _sendInFlight = false;
+  bool _cancelRequested = false;
 
   Future<void> initialize() async {
     final sessions = await _database.listSessions();
@@ -208,7 +218,24 @@ class ChatController extends StateNotifier<ChatState> {
     required String newConversationTitle,
   }) async {
     final text = rawText.trim();
-    if (text.isEmpty || state.sending) return;
+    if (text.isEmpty || state.sending || _sendInFlight) return;
+    // Database persistence starts before `state.sending` becomes visible.
+    // Lock synchronously so rapid taps cannot start two requests against the
+    // same local engine during that short window.
+    _sendInFlight = true;
+    _cancelRequested = false;
+    try {
+      await _sendLocked(text, newConversationTitle: newConversationTitle);
+    } finally {
+      _cancelRequested = false;
+      _sendInFlight = false;
+    }
+  }
+
+  Future<void> _sendLocked(
+    String text, {
+    required String newConversationTitle,
+  }) async {
     var session = state.currentSession;
     if (session == null) {
       final now = DateTime.now();
@@ -243,19 +270,16 @@ class ChatController extends StateNotifier<ChatState> {
       messages: updatedMessages,
       attachments: const [],
       sending: true,
-      slow: false,
+      cancelling: false,
       clearError: true,
       partialResponse: '',
       clearAgentEnvelope: true,
       agentResults: const [],
+      rollbackComplete: false,
     );
-    _slowTimer?.cancel();
-    _slowTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && state.sending) state = state.copyWith(slow: true);
-    });
-
     try {
       final result = await _complete(settings, updatedMessages);
+      _throwIfCancelled();
       final envelope = settings.selectedChatMode == ChatMode.agent
           ? AgentEnvelope.tryParse(result.text)
           : null;
@@ -281,7 +305,7 @@ class ChatController extends StateNotifier<ChatState> {
       state = state.copyWith(
         messages: [...updatedMessages, assistant],
         sending: false,
-        slow: false,
+        cancelling: false,
         partialResponse: '',
         agentEnvelope: envelope,
         sessions: await _database.listSessions(),
@@ -289,9 +313,22 @@ class ChatController extends StateNotifier<ChatState> {
     } on _ChatGuardException catch (error) {
       state = state.copyWith(
         sending: false,
-        slow: false,
+        cancelling: false,
         errorCode: error.code,
         errorDetail: error.detail,
+      );
+    } on LocalInferenceCancelledException {
+      await _database.addWorkLog(
+        category: 'inference',
+        title: 'cancelled:${settings.selectedModelId}',
+        detail: 'user-cancelled',
+        status: 'cancelled',
+      );
+      state = state.copyWith(
+        sending: false,
+        cancelling: false,
+        partialResponse: '',
+        clearError: true,
       );
     } on LocalInferenceException catch (error) {
       await _database.addWorkLog(
@@ -302,17 +339,26 @@ class ChatController extends StateNotifier<ChatState> {
       );
       state = state.copyWith(
         sending: false,
-        slow: false,
+        cancelling: false,
         errorCode: ChatErrorCode.localEngineUnavailable,
         errorDetail: error.stage.name,
       );
     } on DioException catch (error) {
+      if (_cancelRequested || CancelToken.isCancel(error)) {
+        state = state.copyWith(
+          sending: false,
+          cancelling: false,
+          partialResponse: '',
+          clearError: true,
+        );
+        return;
+      }
       final network =
           error.type == DioExceptionType.connectionError ||
           error.type == DioExceptionType.connectionTimeout;
       state = state.copyWith(
         sending: false,
-        slow: false,
+        cancelling: false,
         errorCode: network
             ? ChatErrorCode.networkUnavailable
             : ChatErrorCode.requestFailed,
@@ -321,12 +367,11 @@ class ChatController extends StateNotifier<ChatState> {
     } on Object catch (error) {
       state = state.copyWith(
         sending: false,
-        slow: false,
+        cancelling: false,
         errorCode: ChatErrorCode.requestFailed,
         errorDetail: error.toString(),
       );
     } finally {
-      _slowTimer?.cancel();
       _cancelToken = null;
     }
   }
@@ -336,18 +381,21 @@ class ChatController extends StateNotifier<ChatState> {
     List<ChatMessage> messages,
   ) async {
     final prompt = _systemPrompt(settings);
+    _throwIfCancelled();
     if (settings.selectedChatMode == ChatMode.harness) {
       final profile = state.profiles
           .where(
             (item) =>
                 item.id == settings.harnessApiProfileId &&
-                item.providerId == 'deepseek',
+                item.format != ApiFormat.local &&
+                item.isDeepSeekProfile,
           )
           .firstOrNull;
       if (profile == null || profile.lastTestedAt == null) {
         throw const _ChatGuardException(ChatErrorCode.harnessDeepSeekRequired);
       }
       final key = await _keys.readApiKey(profile.id) ?? '';
+      _throwIfCancelled();
       if (key.isEmpty) {
         throw const _ChatGuardException(ChatErrorCode.harnessDeepSeekRequired);
       }
@@ -362,12 +410,18 @@ class ChatController extends StateNotifier<ChatState> {
       return result;
     }
     if (settings.selectedModelId.startsWith('custom:')) {
-      final id = settings.selectedModelId.substring('custom:'.length);
+      final selection = settings.selectedModelId.substring('custom:'.length);
+      final separator = selection.indexOf(':');
+      final id = separator < 0 ? selection : selection.substring(0, separator);
+      final modelAlias = separator < 0
+          ? null
+          : Uri.decodeComponent(selection.substring(separator + 1));
       final profile = state.profiles.where((item) => item.id == id).firstOrNull;
       if (profile == null || profile.lastTestedAt == null) {
         throw const _ChatGuardException(ChatErrorCode.apiNotTested);
       }
       final key = await _keys.readApiKey(profile.id) ?? '';
+      _throwIfCancelled();
       _cancelToken = CancelToken();
       final result = await _remoteComplete(
         profile: profile,
@@ -375,6 +429,7 @@ class ChatController extends StateNotifier<ChatState> {
         messages: messages,
         prompt: prompt,
         settings: settings,
+        modelAlias: modelAlias,
       );
       await _database.addUsage(profile.id, result.usage);
       return result;
@@ -382,29 +437,50 @@ class ChatController extends StateNotifier<ChatState> {
 
     final model = ModelCatalog.byId(settings.selectedModelId);
     if (model.family == ModelFamily.local) {
-      final path = await _downloads.installedPath(model.id);
-      if (path == null) {
+      final artifactPaths = await _downloads.installedArtifactPaths(model);
+      _throwIfCancelled();
+      final primaryId = model.primaryArtifact?.id ?? 'model';
+      if (artifactPaths[primaryId] == null) {
+        throw const _ChatGuardException(ChatErrorCode.localNotDownloaded);
+      }
+      // On-device vision is evaluated only for attachments added in the
+      // current turn. Re-encoding historical images on every follow-up makes
+      // cancellation ineffective during multimodal prefill and needlessly
+      // burns memory; the prior assistant answer carries their textual context.
+      final needsProjector = messages.last.attachments.any(
+        (attachment) => attachment.mimeType.startsWith('image/'),
+      );
+      final projector = model.projectorArtifact;
+      if (needsProjector &&
+          (projector == null || artifactPaths[projector.id] == null)) {
         throw const _ChatGuardException(ChatErrorCode.localNotDownloaded);
       }
       final status = await _localInference.status();
+      _throwIfCancelled();
       if (!status.available) {
         throw _ChatGuardException(
           ChatErrorCode.localEngineUnavailable,
           status.detail,
         );
       }
-      final minimumBytes = (model.minimumMemoryGb ?? 0) * 1024 * 1024 * 1024;
-      if (status.memoryBytes > 0 && status.memoryBytes < minimumBytes) {
-        throw const _ChatGuardException(ChatErrorCode.insufficientMemory);
+      // A downloaded vision projector is not part of a text-only request's
+      // working set. Keeping it out here avoids both needless model-load time
+      // and a false low-memory rejection on otherwise capable phones.
+      final inferenceArtifacts = {...artifactPaths};
+      if (!needsProjector && projector != null) {
+        inferenceArtifacts.remove(projector.id);
       }
       await _database.addWorkLog(
         category: 'inference',
         title: 'start:${model.id}',
-        detail: 'context=${settings.contextWindow} path=$path',
+        detail:
+            'context=${settings.contextWindow} artifacts=${inferenceArtifacts.keys.join(',')}',
         status: 'started',
       );
+      _throwIfCancelled();
       final result = await _localInference.complete(
-        modelPath: path,
+        model: model,
+        artifactPaths: inferenceArtifacts,
         messages: messages,
         systemPrompt: prompt,
         contextWindow: settings.contextWindow,
@@ -415,6 +491,7 @@ class ChatController extends StateNotifier<ChatState> {
           if (mounted) state = state.copyWith(partialResponse: text);
         },
       );
+      _throwIfCancelled();
       await _database.addWorkLog(
         category: 'inference',
         title: 'completed:${model.id}',
@@ -433,6 +510,7 @@ class ChatController extends StateNotifier<ChatState> {
     required List<ChatMessage> messages,
     required String prompt,
     required AppSettings settings,
+    String? modelAlias,
   }) async {
     _cancelToken = CancelToken();
     if (!settings.streamResponses) {
@@ -444,6 +522,7 @@ class ChatController extends StateNotifier<ChatState> {
         temperature: settings.temperature,
         topP: settings.topP,
         maxTokens: settings.maxTokens,
+        modelId: modelAlias,
         cancelToken: _cancelToken,
       );
     }
@@ -457,6 +536,7 @@ class ChatController extends StateNotifier<ChatState> {
       temperature: settings.temperature,
       topP: settings.topP,
       maxTokens: settings.maxTokens,
+      modelId: modelAlias,
       cancelToken: _cancelToken,
     )) {
       buffer.write(chunk.textDelta);
@@ -465,7 +545,7 @@ class ChatController extends StateNotifier<ChatState> {
         state = state.copyWith(partialResponse: buffer.toString());
       }
     }
-    return CompletionResult(buffer.toString(), usage);
+    return CompletionResult(buffer.toString(), profile.applyBilling(usage));
   }
 
   String _systemPrompt(AppSettings settings) {
@@ -487,10 +567,17 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> cancel() async {
+    if (!state.sending || state.cancelling) return;
+    _cancelRequested = true;
+    state = state.copyWith(cancelling: true, partialResponse: '');
     _cancelToken?.cancel('user-cancelled');
     await _localInference.cancel();
-    _slowTimer?.cancel();
-    state = state.copyWith(sending: false, slow: false, partialResponse: '');
+  }
+
+  void _throwIfCancelled() {
+    if (_cancelRequested) {
+      throw const LocalInferenceCancelledException();
+    }
   }
 
   Future<void> executePendingAgentActions({
@@ -508,12 +595,55 @@ class ChatController extends StateNotifier<ChatState> {
     state = state.copyWith(agentResults: results);
   }
 
-  void clearAgentActions() =>
-      state = state.copyWith(clearAgentEnvelope: true, agentResults: const []);
+  Future<void> rollbackLastAgentExecution() async {
+    final workspace = _settings().activeWorkspacePath;
+    final executionId = _agent.lastExecutionId;
+    if (workspace == null || executionId == null || state.rollingBack) return;
+    state = state.copyWith(rollingBack: true, rollbackComplete: false);
+    try {
+      await _agent.rollback(executionId: executionId, workspacePath: workspace);
+      state = state.copyWith(rollingBack: false, rollbackComplete: true);
+    } on Object catch (error) {
+      state = state.copyWith(
+        rollingBack: false,
+        errorCode: ChatErrorCode.requestFailed,
+        errorDetail: error.toString(),
+      );
+    }
+  }
+
+  Future<void> continueAgentRun({
+    required String instruction,
+    required String conversationTitle,
+  }) async {
+    if (state.agentResults.isEmpty || state.sending) return;
+    final payload = jsonEncode([
+      for (final result in state.agentResults)
+        {
+          'actionId': result.action.id,
+          'type': result.action.type.name,
+          'path': result.action.path,
+          'success': result.success,
+          'exitCode': result.exitCode,
+          'output': result.output.length > 12000
+              ? result.output.substring(0, 12000)
+              : result.output,
+        },
+    ]);
+    await send(
+      '$instruction\n<siqi_action_results>\n$payload\n</siqi_action_results>',
+      newConversationTitle: conversationTitle,
+    );
+  }
+
+  void clearAgentActions() => state = state.copyWith(
+    clearAgentEnvelope: true,
+    agentResults: const [],
+    rollbackComplete: false,
+  );
 
   @override
   void dispose() {
-    _slowTimer?.cancel();
     _cancelToken?.cancel();
     super.dispose();
   }

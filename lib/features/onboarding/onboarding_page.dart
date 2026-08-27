@@ -63,15 +63,26 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
     final path = await FilePicker.platform.getDirectoryPath(
       initialDirectory: AppConstants.preferredProjectsPath,
     );
+    final writable =
+        path != null &&
+        await ref.read(workspaceServiceProvider).verifyWritableDirectory(path);
     await ref
         .read(permissionServiceProvider)
         .recordSystemPicker(
           kind: AppPermissionKind.workspaceFolder,
           purpose: PermissionPurpose.workspaceAccess,
-          granted: path != null,
+          granted: writable,
           detail: path,
         );
     if (path == null) return;
+    if (!writable) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.folderNotWritable)));
+      }
+      return;
+    }
     await ref
         .read(settingsProvider.notifier)
         .update((current) => current.copyWith(activeWorkspacePath: path));

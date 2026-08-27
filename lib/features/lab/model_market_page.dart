@@ -8,20 +8,26 @@ import '../../core/models/app_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../l10n/l10n.dart';
 
-class ModelMarketPage extends ConsumerWidget {
+class ModelMarketPage extends ConsumerStatefulWidget {
   const ModelMarketPage({super.key});
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ModelMarketPage> createState() => _ModelMarketPageState();
+}
+
+class _ModelMarketPageState extends ConsumerState<ModelMarketPage> {
+  ModelTask _task = ModelTask.chat;
+
+  @override
+  Widget build(BuildContext context) {
     final downloads = ref.watch(downloadProvider);
     final settings = ref.watch(settingsProvider);
     final models = ModelCatalog.models
         .where(
           (model) =>
               model.family == ModelFamily.local &&
-              model.downloadUrl != null &&
               model.sourceUrl != null &&
-              model.sizeBytes != null &&
-              model.expectedSha256 != null,
+              _taskGroup(model.task) == _task,
         )
         .toList();
     return Scaffold(
@@ -43,30 +49,65 @@ class ModelMarketPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<ModelTask>(
+              segments: [
+                ButtonSegment(
+                  value: ModelTask.chat,
+                  icon: const SiqiIcon(SiqiGlyph.chat, size: 18),
+                  label: Text(context.l10n.conversationModels),
+                ),
+                ButtonSegment(
+                  value: ModelTask.speechSynthesis,
+                  icon: const SiqiIcon(SiqiGlyph.play, size: 18),
+                  label: Text(context.l10n.textToSpeech),
+                ),
+                ButtonSegment(
+                  value: ModelTask.speechRecognition,
+                  icon: const SiqiIcon(SiqiGlyph.audio, size: 18),
+                  label: Text(context.l10n.speechToText),
+                ),
+                ButtonSegment(
+                  value: ModelTask.opticalCharacterRecognition,
+                  icon: const SiqiIcon(SiqiGlyph.image, size: 18),
+                  label: Text(context.l10n.ocrModels),
+                ),
+              ],
+              selected: {_task},
+              onSelectionChanged: (value) =>
+                  setState(() => _task = value.first),
+            ),
+          ),
+          const SizedBox(height: 8),
           for (final model in models)
             _ModelDownloadCard(
               model: model,
               download: downloads[model.id],
-              onDownload: () {
-                ref
-                    .read(downloadProvider.notifier)
-                    .start(
-                      model: model,
-                      storagePath: settings.modelStoragePath,
-                      title: context.l10n.notificationDownloadTitle(
-                        model.displayName,
-                      ),
-                      body: context.l10n.notificationDownloadBody,
-                      channel: context.l10n.notificationChannelDownloads,
-                      channelDescription:
-                          context.l10n.notificationChannelDownloadsDescription,
-                    );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(context.l10n.downloadStarted)),
-                );
-              },
+              onDownload: model.downloadable
+                  ? () {
+                      ref
+                          .read(downloadProvider.notifier)
+                          .start(
+                            model: model,
+                            storagePath: settings.modelStoragePath,
+                            title: context.l10n.notificationDownloadTitle(
+                              model.displayName,
+                            ),
+                            body: context.l10n.notificationDownloadBody,
+                            channel: context.l10n.notificationChannelDownloads,
+                            channelDescription: context
+                                .l10n
+                                .notificationChannelDownloadsDescription,
+                          );
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(context.l10n.downloadStarted)),
+                      );
+                    }
+                  : null,
               onPause: () =>
                   ref.read(downloadProvider.notifier).pause(model.id),
+              onRemove: () => _removeModel(context, ref, model),
               onSource: model.sourceUrl == null
                   ? null
                   : () => launchUrl(
@@ -78,6 +119,47 @@ class ModelMarketPage extends ConsumerWidget {
       ),
     );
   }
+
+  ModelTask _taskGroup(ModelTask task) => switch (task) {
+    ModelTask.chat || ModelTask.visionLanguage => ModelTask.chat,
+    ModelTask.speechSynthesis => ModelTask.speechSynthesis,
+    ModelTask.speechRecognition => ModelTask.speechRecognition,
+    ModelTask.opticalCharacterRecognition ||
+    ModelTask.vision => ModelTask.opticalCharacterRecognition,
+  };
+
+  Future<void> _removeModel(
+    BuildContext context,
+    WidgetRef ref,
+    ModelDefinition model,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.removeModel),
+        content: Text(context.l10n.removeModelBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.delete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final removed = await ref.read(downloadProvider.notifier).remove(model.id);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.modelRemoved(_formatBytes(removed))),
+        ),
+      );
+    }
+  }
 }
 
 class _ModelDownloadCard extends ConsumerWidget {
@@ -86,12 +168,14 @@ class _ModelDownloadCard extends ConsumerWidget {
     required this.download,
     required this.onDownload,
     required this.onPause,
+    required this.onRemove,
     required this.onSource,
   });
   final ModelDefinition model;
   final ModelDownloadState? download;
-  final VoidCallback onDownload;
+  final VoidCallback? onDownload;
   final VoidCallback onPause;
+  final VoidCallback onRemove;
   final VoidCallback? onSource;
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -129,11 +213,13 @@ class _ModelDownloadCard extends ConsumerWidget {
               spacing: 8,
               runSpacing: 6,
               children: [
-                if (model.sizeBytes != null)
+                if (model.totalDownloadBytes > 0)
                   Chip(
                     avatar: const SiqiIcon(SiqiGlyph.storage, size: 16),
                     label: Text(
-                      context.l10n.modelSize(_formatBytes(model.sizeBytes!)),
+                      context.l10n.modelSize(
+                        _formatBytes(model.totalDownloadBytes),
+                      ),
                     ),
                   ),
                 if (model.minimumMemoryGb != null)
@@ -145,8 +231,17 @@ class _ModelDownloadCard extends ConsumerWidget {
                   ),
                 if (!model.isDeviceCompatible)
                   Chip(
-                    avatar: const SiqiIcon(SiqiGlyph.warning, size: 16),
-                    label: Text(context.l10n.serverOnlyModel),
+                    avatar: const SiqiIcon(SiqiGlyph.info, size: 16),
+                    label: Text(
+                      model.downloadable
+                          ? context.l10n.modelFilesOnly
+                          : context.l10n.compatibilityTarget,
+                    ),
+                  ),
+                if (model.runtimeBundled)
+                  Chip(
+                    avatar: const SiqiIcon(SiqiGlyph.check, size: 16),
+                    label: Text(context.l10n.runtimeBundled),
                   ),
               ],
             ),
@@ -194,15 +289,37 @@ class _ModelDownloadCard extends ConsumerWidget {
                         icon: const SiqiIcon(SiqiGlyph.pause),
                         label: Text(context.l10n.pause),
                       )
-                    : FutureBuilder<String?>(
+                    : !model.downloadable
+                    ? FilledButton.tonalIcon(
+                        onPressed: null,
+                        icon: const SiqiIcon(SiqiGlyph.info),
+                        label: Text(context.l10n.awaitingOfficialArtifacts),
+                      )
+                    : FutureBuilder<bool>(
                         future: ref
                             .read(modelDownloadServiceProvider)
-                            .installedPath(model.id),
+                            .isFullyInstalled(model),
                         builder: (context, snapshot) {
-                          if (snapshot.data != null) {
-                            return Chip(
-                              avatar: const SiqiIcon(SiqiGlyph.check, size: 18),
-                              label: Text(context.l10n.installed),
+                          if (snapshot.data == true) {
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Chip(
+                                  avatar: const SiqiIcon(
+                                    SiqiGlyph.check,
+                                    size: 18,
+                                  ),
+                                  label: Text(context.l10n.installed),
+                                ),
+                                IconButton(
+                                  tooltip: context.l10n.removeModel,
+                                  onPressed: onRemove,
+                                  icon: const SiqiIcon(
+                                    SiqiGlyph.close,
+                                    size: 18,
+                                  ),
+                                ),
+                              ],
                             );
                           }
                           return FilledButton.tonalIcon(

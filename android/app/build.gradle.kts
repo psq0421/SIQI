@@ -1,4 +1,5 @@
 import java.util.Properties
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -15,7 +16,7 @@ if (hasReleaseSigning) {
 
 android {
     namespace = "com.psq.siqi"
-    compileSdk = 36
+    compileSdk = 37
     ndkVersion = "29.0.14206865"
 
     compileOptions {
@@ -24,16 +25,26 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
-
     defaultConfig {
         applicationId = "com.psq.siqi"
         minSdk = 29
-        targetSdk = 36
+        targetSdk = 37
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        ndk {
+            // The bundled llama.cpp runtime is arm64-only. Shipping other ABIs
+            // produced much larger APKs with an incomplete offline feature set.
+            abiFilters += "arm64-v8a"
+        }
+    }
+
+    packaging {
+        jniLibs {
+            // Compress native runtimes in the sideloadable APK. Android extracts
+            // them during installation; inference behavior remains unchanged.
+            useLegacyPackaging = true
+            excludes += setOf("lib/x86_64/**", "lib/armeabi-v7a/**")
+        }
     }
 
     signingConfigs {
@@ -55,6 +66,12 @@ android {
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 

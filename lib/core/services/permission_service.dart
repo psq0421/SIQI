@@ -56,6 +56,8 @@ class PermissionService {
     AppPermissionKind.microphone => Permission.microphone,
     AppPermissionKind.camera => Permission.camera,
     AppPermissionKind.photos => Permission.photos,
+    AppPermissionKind.fileReadWrite => Permission.storage,
+    AppPermissionKind.allFilesAccess => Permission.manageExternalStorage,
     AppPermissionKind.workspaceFolder => null,
   };
 

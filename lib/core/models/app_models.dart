@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:collection/collection.dart';
+
 enum AppThemeMode { system, light, dark }
 
 enum SaveInterval { realtime, fiveMinutes, manual }
@@ -13,6 +15,37 @@ enum ChatMode { chat, agent, harness, mcp, team }
 enum ModelFamily { customApi, local }
 
 enum ApiFormat { openAi, anthropic, local }
+
+enum ModelTask {
+  chat,
+  visionLanguage,
+  speechRecognition,
+  speechSynthesis,
+  opticalCharacterRecognition,
+  vision,
+}
+
+enum ModelRuntime {
+  llamaCpp,
+  mnn,
+  onnxRuntime,
+  sherpaOnnx,
+  paddleLite,
+  external,
+}
+
+enum ModelFormat { gguf, mnn, onnx, safetensors, bundle }
+
+enum ModelCapability { text, imageInput, audioInput, audioOutput, tools }
+
+enum ModelArtifactRole {
+  model,
+  projector,
+  tokenizer,
+  config,
+  vocabulary,
+  runtime,
+}
 
 enum MessageRole { user, assistant, system, tool }
 
@@ -287,7 +320,40 @@ class ModelDefinition {
     this.sourceUrl,
     this.expectedSha256,
     this.isDeviceCompatible = true,
+    this.task = ModelTask.chat,
+    this.runtime = ModelRuntime.llamaCpp,
+    this.format = ModelFormat.gguf,
+    this.capabilities = const {ModelCapability.text},
+    this.quantization = 'Q4_K_M',
+    this.artifacts = const [],
+    this.verifiedAt,
+    this.blockReason,
+    this.runtimeBundled = true,
   });
+
+  const ModelDefinition.compatibilityTarget({
+    required this.id,
+    required this.displayName,
+    required this.provider,
+    required this.license,
+    required this.task,
+    required this.sourceUrl,
+    this.isMultimodal = false,
+    this.capabilities = const {ModelCapability.text},
+    this.blockReason = 'official-runtime-artifacts-unavailable',
+  }) : family = ModelFamily.local,
+       apiFormat = ApiFormat.local,
+       sizeBytes = null,
+       minimumMemoryGb = null,
+       downloadUrl = null,
+       expectedSha256 = null,
+       isDeviceCompatible = false,
+       runtime = ModelRuntime.external,
+       format = ModelFormat.bundle,
+       quantization = '',
+       artifacts = const [],
+       verifiedAt = null,
+       runtimeBundled = false;
   final String id;
   final String displayName;
   final ModelFamily family;
@@ -301,6 +367,87 @@ class ModelDefinition {
   final String? sourceUrl;
   final String? expectedSha256;
   final bool isDeviceCompatible;
+  final ModelTask task;
+  final ModelRuntime runtime;
+  final ModelFormat format;
+  final Set<ModelCapability> capabilities;
+  final String quantization;
+  final List<ModelArtifact> artifacts;
+  final DateTime? verifiedAt;
+  final String? blockReason;
+
+  /// Whether this APK contains a native runtime that understands the model
+  /// artifacts. A model can still be downloadable when this is false, which
+  /// is useful for locally managing official weights without pretending they
+  /// can be executed by an unrelated engine.
+  final bool runtimeBundled;
+
+  bool get downloadable =>
+      blockReason == null &&
+      installArtifacts.isNotEmpty &&
+      installArtifacts.every(
+        (artifact) =>
+            artifact.downloadUrl.isNotEmpty &&
+            artifact.expectedSha256.length == 64 &&
+            artifact.sizeBytes > 0,
+      );
+
+  bool get installable => isDeviceCompatible && downloadable;
+
+  bool get runnable => isDeviceCompatible && runtimeBundled;
+
+  int get totalDownloadBytes => artifacts.isEmpty
+      ? sizeBytes ?? 0
+      : artifacts.fold(0, (total, artifact) => total + artifact.sizeBytes);
+
+  List<ModelArtifact> get installArtifacts {
+    if (artifacts.isNotEmpty) return artifacts;
+    final url = downloadUrl;
+    final sha256 = expectedSha256;
+    final size = sizeBytes;
+    if (url == null || sha256 == null || size == null) return const [];
+    return [
+      ModelArtifact(
+        id: 'model',
+        fileName: '$id.${format.name}',
+        role: ModelArtifactRole.model,
+        format: format,
+        downloadUrl: url,
+        sizeBytes: size,
+        expectedSha256: sha256,
+      ),
+    ];
+  }
+
+  ModelArtifact? get primaryArtifact => installArtifacts
+      .where((artifact) => artifact.role == ModelArtifactRole.model)
+      .firstOrNull;
+
+  ModelArtifact? get projectorArtifact => installArtifacts
+      .where((artifact) => artifact.role == ModelArtifactRole.projector)
+      .firstOrNull;
+}
+
+class ModelArtifact {
+  const ModelArtifact({
+    required this.id,
+    required this.fileName,
+    required this.role,
+    required this.format,
+    required this.downloadUrl,
+    required this.sizeBytes,
+    required this.expectedSha256,
+    this.optional = false,
+  });
+
+  final String id;
+  final String fileName;
+  final ModelArtifactRole role;
+  final ModelFormat format;
+  final String downloadUrl;
+  final int sizeBytes;
+  final String expectedSha256;
+  final bool optional;
 }
 
 class ProviderTemplate {
@@ -320,6 +467,12 @@ class ApiProfile {
     required this.modelId,
     required this.format,
     required this.isMultimodal,
+    this.notes = '',
+    this.modelMappings = const {},
+    this.fallbackModelId = '',
+    this.billingCurrency = '',
+    this.inputPricePerMillion,
+    this.outputPricePerMillion,
     this.headers = const {},
     this.lastTestedAt,
     this.inputTokens = 0,
@@ -333,11 +486,52 @@ class ApiProfile {
   final String modelId;
   final ApiFormat format;
   final bool isMultimodal;
+  final String notes;
+  final Map<String, String> modelMappings;
+  final String fallbackModelId;
+  final String billingCurrency;
+  final double? inputPricePerMillion;
+  final double? outputPricePerMillion;
   final Map<String, String> headers;
   final DateTime? lastTestedAt;
   final int inputTokens;
   final int outputTokens;
   final double estimatedCost;
+
+  String get defaultModelId =>
+      fallbackModelId.trim().isNotEmpty ? fallbackModelId.trim() : modelId;
+
+  Map<String, String> get selectableModels {
+    final models = <String, String>{...modelMappings};
+    if (!models.containsValue(defaultModelId)) {
+      models[name] = defaultModelId;
+    }
+    return models;
+  }
+
+  String resolveModel(String? alias) {
+    if (alias == null || alias.isEmpty) return defaultModelId;
+    return modelMappings[alias] ?? alias;
+  }
+
+  TokenUsage applyBilling(TokenUsage usage) {
+    final inputPrice = inputPricePerMillion;
+    final outputPrice = outputPricePerMillion;
+    if (inputPrice == null && outputPrice == null) return usage;
+    return TokenUsage(
+      input: usage.input,
+      output: usage.output,
+      estimatedCost:
+          usage.input / 1000000 * (inputPrice ?? 0) +
+          usage.output / 1000000 * (outputPrice ?? 0),
+    );
+  }
+
+  bool get isDeepSeekProfile {
+    if (providerId.toLowerCase() == 'deepseek') return true;
+    final host = Uri.tryParse(baseUrl)?.host.toLowerCase() ?? '';
+    return host == 'api.deepseek.com' || host.endsWith('.deepseek.com');
+  }
 
   Map<String, Object?> toDatabase() => {
     'id': id,
@@ -347,6 +541,12 @@ class ApiProfile {
     'model_id': modelId,
     'format': format.name,
     'is_multimodal': isMultimodal ? 1 : 0,
+    'notes': notes,
+    'model_mappings_json': jsonEncode(modelMappings),
+    'fallback_model_id': fallbackModelId,
+    'billing_currency': billingCurrency,
+    'input_price_per_million': inputPricePerMillion,
+    'output_price_per_million': outputPricePerMillion,
     'headers_json': jsonEncode(headers),
     'last_tested_at': lastTestedAt?.millisecondsSinceEpoch,
     'input_tokens': inputTokens,
@@ -362,6 +562,15 @@ class ApiProfile {
     modelId: map['model_id']! as String,
     format: ApiFormat.values.byName(map['format']! as String),
     isMultimodal: map['is_multimodal'] == 1,
+    notes: map['notes'] as String? ?? '',
+    modelMappings: Map<String, String>.from(
+      jsonDecode(map['model_mappings_json'] as String? ?? '{}') as Map,
+    ),
+    fallbackModelId: map['fallback_model_id'] as String? ?? '',
+    billingCurrency: map['billing_currency'] as String? ?? '',
+    inputPricePerMillion: (map['input_price_per_million'] as num?)?.toDouble(),
+    outputPricePerMillion: (map['output_price_per_million'] as num?)
+        ?.toDouble(),
     headers: Map<String, String>.from(
       jsonDecode(map['headers_json']! as String) as Map,
     ),

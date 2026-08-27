@@ -30,4 +30,13 @@ class DownloadController
   }
 
   void pause(String modelId) => _service.pause(modelId);
+
+  Future<int> remove(String modelId) async {
+    final removed = await _service.removeInstalled(modelId);
+    state = {
+      for (final entry in state.entries)
+        if (entry.key != modelId) entry.key: entry.value,
+    };
+    return removed;
+  }
 }

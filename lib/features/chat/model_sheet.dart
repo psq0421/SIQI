@@ -65,13 +65,33 @@ class ModelSheet extends ConsumerWidget {
                 ),
               )
             else
-              ...visibleProfiles.map(
-                (profile) => _ProfileTile(
-                  profile: profile,
-                  selected: selected == 'custom:${profile.id}',
-                  onTap: () => _selectProfile(context, ref, profile),
-                ),
-              ),
+              ...visibleProfiles.expand((profile) {
+                final models = harnessMode
+                    ? <String, String>{profile.name: profile.defaultModelId}
+                    : profile.selectableModels;
+                return models.entries.map((entry) {
+                  final selectionId = _profileSelectionId(
+                    profile.id,
+                    entry.key,
+                  );
+                  return _ProfileTile(
+                    profile: profile,
+                    displayName: entry.key,
+                    upstreamModelId: entry.value,
+                    selected:
+                        selected == selectionId ||
+                        (selected == 'custom:${profile.id}' &&
+                            entry.value == profile.defaultModelId) ||
+                        (harnessMode && selected == 'custom:${profile.id}'),
+                    onTap: () => _selectProfile(
+                      context,
+                      ref,
+                      profile,
+                      alias: harnessMode ? null : entry.key,
+                    ),
+                  );
+                });
+              }),
             if (!harnessMode) ...[
               const SizedBox(height: 18),
               _SectionTitle(
@@ -81,7 +101,9 @@ class ModelSheet extends ConsumerWidget {
               if (!ModelCatalog.models.any(
                 (model) =>
                     model.family == ModelFamily.local &&
-                    model.isDeviceCompatible,
+                    model.runnable &&
+                    (model.task == ModelTask.chat ||
+                        model.task == ModelTask.visionLanguage),
               ))
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -96,7 +118,9 @@ class ModelSheet extends ConsumerWidget {
                   .where(
                     (model) =>
                         model.family == ModelFamily.local &&
-                        model.isDeviceCompatible,
+                        model.runnable &&
+                        (model.task == ModelTask.chat ||
+                            model.task == ModelTask.visionLanguage),
                   )
                   .map(
                     (model) => _ModelTile(
@@ -138,15 +162,18 @@ class ModelSheet extends ConsumerWidget {
   Future<void> _selectProfile(
     BuildContext context,
     WidgetRef ref,
-    ApiProfile profile,
-  ) async {
+    ApiProfile profile, {
+    String? alias,
+  }) async {
     final harnessMode =
         ref.read(settingsProvider).selectedChatMode == ChatMode.harness;
     await ref
         .read(settingsProvider.notifier)
         .update(
           (current) => current.copyWith(
-            selectedModelId: 'custom:${profile.id}',
+            selectedModelId: alias == null
+                ? 'custom:${profile.id}'
+                : _profileSelectionId(profile.id, alias),
             harnessApiProfileId: harnessMode ? profile.id : null,
           ),
         );
@@ -227,10 +254,14 @@ class _ModelTile extends ConsumerWidget {
 class _ProfileTile extends StatelessWidget {
   const _ProfileTile({
     required this.profile,
+    required this.displayName,
+    required this.upstreamModelId,
     required this.selected,
     required this.onTap,
   });
   final ApiProfile profile;
+  final String displayName;
+  final String upstreamModelId;
   final bool selected;
   final VoidCallback onTap;
   @override
@@ -239,9 +270,12 @@ class _ProfileTile extends StatelessWidget {
     child: ListTile(
       onTap: onTap,
       leading: SiqiIcon(profile.isMultimodal ? SiqiGlyph.image : SiqiGlyph.key),
-      title: Text(profile.name),
-      subtitle: Text(profile.modelId),
+      title: Text('$displayName · ${profile.name}'),
+      subtitle: Text(upstreamModelId),
       trailing: selected ? const SiqiIcon(SiqiGlyph.check) : null,
     ),
   );
 }
+
+String _profileSelectionId(String profileId, String alias) =>
+    'custom:$profileId:${Uri.encodeComponent(alias)}';

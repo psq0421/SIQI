@@ -19,6 +19,27 @@ class DeviceMemoryInfo {
   final int lowMemoryThresholdBytes;
 }
 
+class StorageInfo {
+  const StorageInfo({required this.availableBytes, required this.totalBytes});
+
+  final int availableBytes;
+  final int totalBytes;
+}
+
+class DeviceRuntimeInfo {
+  const DeviceRuntimeInfo({
+    required this.sdkInt,
+    required this.processorCount,
+    required this.isLowRamDevice,
+    required this.supportedAbis,
+  });
+
+  final int sdkInt;
+  final int processorCount;
+  final bool isLowRamDevice;
+  final List<String> supportedAbis;
+}
+
 class PlatformService {
   const PlatformService();
 
@@ -42,6 +63,32 @@ class PlatformService {
       availableBytes: result['availableBytes'] as int? ?? 0,
       totalBytes: result['totalBytes'] as int? ?? 0,
       lowMemoryThresholdBytes: result['lowMemoryThresholdBytes'] as int? ?? 0,
+    );
+  }
+
+  Future<StorageInfo> storageInfo(String path) async {
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('storageStatus', {
+          'path': path,
+        }) ??
+        const <String, dynamic>{};
+    return StorageInfo(
+      availableBytes: result['availableBytes'] as int? ?? 0,
+      totalBytes: result['totalBytes'] as int? ?? 0,
+    );
+  }
+
+  Future<DeviceRuntimeInfo> runtimeInfo() async {
+    final result =
+        await _channel.invokeMapMethod<String, dynamic>('runtimeInfo') ??
+        const <String, dynamic>{};
+    return DeviceRuntimeInfo(
+      sdkInt: result['sdkInt'] as int? ?? 0,
+      processorCount: result['processorCount'] as int? ?? 1,
+      isLowRamDevice: result['isLowRamDevice'] as bool? ?? false,
+      supportedAbis: (result['supportedAbis'] as List? ?? const [])
+          .map((item) => item.toString())
+          .toList(),
     );
   }
 }

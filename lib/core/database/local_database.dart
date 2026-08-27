@@ -19,6 +19,8 @@ class LocalDatabase {
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) await _createHarnessPluginTable(db);
         if (oldVersion < 3) await _createOperationalTables(db);
+        if (oldVersion < 4) await _createAlpha2Tables(db);
+        if (oldVersion < 5) await _upgradeApiProfilesForAlpha3(db);
       },
       onCreate: (db, version) async {
         await db.execute('''
@@ -53,6 +55,12 @@ class LocalDatabase {
             model_id TEXT NOT NULL,
             format TEXT NOT NULL,
             is_multimodal INTEGER NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            model_mappings_json TEXT NOT NULL DEFAULT '{}',
+            fallback_model_id TEXT NOT NULL DEFAULT '',
+            billing_currency TEXT NOT NULL DEFAULT '',
+            input_price_per_million REAL,
+            output_price_per_million REAL,
             headers_json TEXT NOT NULL DEFAULT '{}',
             last_tested_at INTEGER,
             input_tokens INTEGER NOT NULL DEFAULT 0,
@@ -89,6 +97,7 @@ class LocalDatabase {
         ''');
         await _createHarnessPluginTable(db);
         await _createOperationalTables(db);
+        await _createAlpha2Tables(db);
       },
     );
     return LocalDatabase._(database);
@@ -115,6 +124,27 @@ class LocalDatabase {
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_harness_plugins_name ON harness_plugins(name COLLATE NOCASE)',
+    );
+  }
+
+  static Future<void> _upgradeApiProfilesForAlpha3(Database db) async {
+    await db.execute(
+      "ALTER TABLE api_profiles ADD COLUMN notes TEXT NOT NULL DEFAULT ''",
+    );
+    await db.execute(
+      "ALTER TABLE api_profiles ADD COLUMN model_mappings_json TEXT NOT NULL DEFAULT '{}'",
+    );
+    await db.execute(
+      "ALTER TABLE api_profiles ADD COLUMN fallback_model_id TEXT NOT NULL DEFAULT ''",
+    );
+    await db.execute(
+      "ALTER TABLE api_profiles ADD COLUMN billing_currency TEXT NOT NULL DEFAULT ''",
+    );
+    await db.execute(
+      'ALTER TABLE api_profiles ADD COLUMN input_price_per_million REAL',
+    );
+    await db.execute(
+      'ALTER TABLE api_profiles ADD COLUMN output_price_per_million REAL',
     );
   }
 
@@ -177,6 +207,86 @@ class LocalDatabase {
         round_index INTEGER NOT NULL,
         created_at INTEGER NOT NULL,
         FOREIGN KEY(team_id) REFERENCES ai_teams(id) ON DELETE CASCADE
+      )
+    ''');
+  }
+
+  static Future<void> _createAlpha2Tables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS model_artifacts(
+        model_id TEXT NOT NULL,
+        artifact_id TEXT NOT NULL,
+        role TEXT NOT NULL,
+        format TEXT NOT NULL,
+        file_path TEXT NOT NULL,
+        file_size INTEGER NOT NULL,
+        checksum TEXT NOT NULL,
+        source_url TEXT NOT NULL,
+        etag TEXT,
+        last_modified TEXT,
+        state TEXT NOT NULL DEFAULT 'completed',
+        completed_at INTEGER NOT NULL,
+        verified_at INTEGER,
+        PRIMARY KEY(model_id, artifact_id)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS harness_sessions(
+        id TEXT PRIMARY KEY,
+        provider TEXT NOT NULL,
+        profile_id TEXT,
+        workspace_path TEXT NOT NULL,
+        status TEXT NOT NULL,
+        capabilities_json TEXT NOT NULL DEFAULT '{}',
+        created_at INTEGER NOT NULL,
+        updated_at INTEGER NOT NULL
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS harness_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        session_id TEXT NOT NULL,
+        event_type TEXT NOT NULL,
+        payload_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES harness_sessions(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_harness_events_session ON harness_events(session_id, created_at)',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tool_approvals(
+        id TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        action_id TEXT NOT NULL,
+        decision TEXT NOT NULL,
+        reason TEXT NOT NULL DEFAULT '',
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY(session_id) REFERENCES harness_sessions(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS agent_executions(
+        id TEXT PRIMARY KEY,
+        session_id TEXT,
+        workspace_path TEXT NOT NULL,
+        summary TEXT NOT NULL,
+        status TEXT NOT NULL,
+        started_at INTEGER NOT NULL,
+        completed_at INTEGER
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS workspace_snapshots(
+        id TEXT PRIMARY KEY,
+        execution_id TEXT NOT NULL,
+        relative_path TEXT NOT NULL,
+        content TEXT,
+        checksum TEXT,
+        existed INTEGER NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY(execution_id) REFERENCES agent_executions(id) ON DELETE CASCADE
       )
     ''');
   }
@@ -286,6 +396,140 @@ class LocalDatabase {
     );
     return rows.isEmpty ? null : rows.first;
   }
+
+  Future<void> saveModelArtifact({
+    required String modelId,
+    required ModelArtifact artifact,
+    required String path,
+    required int size,
+    required String checksum,
+    required String? etag,
+    required String? lastModified,
+  }) => _database.insert('model_artifacts', {
+    'model_id': modelId,
+    'artifact_id': artifact.id,
+    'role': artifact.role.name,
+    'format': artifact.format.name,
+    'file_path': path,
+    'file_size': size,
+    'checksum': checksum,
+    'source_url': artifact.downloadUrl,
+    'etag': etag,
+    'last_modified': lastModified,
+    'state': 'completed',
+    'completed_at': DateTime.now().millisecondsSinceEpoch,
+    'verified_at': DateTime.now().millisecondsSinceEpoch,
+  }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+  Future<Map<String, Object?>?> downloadedModelArtifact(
+    String modelId,
+    String artifactId,
+  ) async {
+    final rows = await _database.query(
+      'model_artifacts',
+      where: 'model_id = ? AND artifact_id = ?',
+      whereArgs: [modelId, artifactId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<List<Map<String, Object?>>> listDownloadedModelArtifacts(
+    String modelId,
+  ) => _database.query(
+    'model_artifacts',
+    where: 'model_id = ?',
+    whereArgs: [modelId],
+    orderBy: "CASE role WHEN 'model' THEN 0 WHEN 'projector' THEN 1 ELSE 2 END",
+  );
+
+  Future<void> markModelArtifactVerified(String modelId, String artifactId) =>
+      _database.update(
+        'model_artifacts',
+        {'verified_at': DateTime.now().millisecondsSinceEpoch},
+        where: 'model_id = ? AND artifact_id = ?',
+        whereArgs: [modelId, artifactId],
+      );
+
+  Future<void> deleteDownloadedModelRecords(String modelId) async {
+    await _database.transaction((transaction) async {
+      await transaction.delete(
+        'model_artifacts',
+        where: 'model_id = ?',
+        whereArgs: [modelId],
+      );
+      await transaction.delete(
+        'model_downloads',
+        where: 'model_id = ?',
+        whereArgs: [modelId],
+      );
+    });
+  }
+
+  Future<void> startAgentExecution({
+    required String id,
+    required String workspacePath,
+    required String summary,
+  }) => _database.insert('agent_executions', {
+    'id': id,
+    'session_id': null,
+    'workspace_path': workspacePath,
+    'summary': summary,
+    'status': 'running',
+    'started_at': DateTime.now().millisecondsSinceEpoch,
+    'completed_at': null,
+  });
+
+  Future<void> saveWorkspaceSnapshot({
+    required String id,
+    required String executionId,
+    required String relativePath,
+    required String? content,
+    required String? checksum,
+    required bool existed,
+  }) => _database.insert('workspace_snapshots', {
+    'id': id,
+    'execution_id': executionId,
+    'relative_path': relativePath,
+    'content': content,
+    'checksum': checksum,
+    'existed': existed ? 1 : 0,
+    'created_at': DateTime.now().millisecondsSinceEpoch,
+  }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+  Future<void> completeAgentExecution(String id, String status) =>
+      _database.update(
+        'agent_executions',
+        {
+          'status': status,
+          'completed_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<List<Map<String, Object?>>> workspaceSnapshots(String executionId) =>
+      _database.query(
+        'workspace_snapshots',
+        where: 'execution_id = ?',
+        whereArgs: [executionId],
+        orderBy: 'created_at DESC',
+      );
+
+  Future<void> recordToolApproval({
+    required String id,
+    required String sessionId,
+    required String actionId,
+    required String decision,
+    String reason = '',
+  }) => _database.insert('tool_approvals', {
+    'id': id,
+    'session_id': sessionId,
+    'action_id': actionId,
+    'decision': decision,
+    'reason': reason,
+    'created_at': DateTime.now().millisecondsSinceEpoch,
+  });
 
   Future<List<Map<String, Object?>>> listMcpServers() =>
       _database.query('mcp_servers', orderBy: 'name COLLATE NOCASE');
@@ -561,6 +805,7 @@ class LocalDatabase {
     'messages': await _database.query('messages'),
     'api_profiles': await _database.query('api_profiles'),
     'model_downloads': await _database.query('model_downloads'),
+    'model_artifacts': await _database.query('model_artifacts'),
     'mcp_servers': await _database.query('mcp_servers'),
     'harness_plugins': await _database.query('harness_plugins'),
     'permission_audit': await _database.query('permission_audit'),
@@ -568,6 +813,11 @@ class LocalDatabase {
     'mcp_catalog': await _database.query('mcp_catalog'),
     'ai_teams': await _database.query('ai_teams'),
     'ai_team_messages': await _database.query('ai_team_messages'),
+    'harness_sessions': await _database.query('harness_sessions'),
+    'harness_events': await _database.query('harness_events'),
+    'tool_approvals': await _database.query('tool_approvals'),
+    'agent_executions': await _database.query('agent_executions'),
+    'workspace_snapshots': await _database.query('workspace_snapshots'),
   };
 
   Future<void> importSnapshot(Map<String, dynamic> snapshot) async {
@@ -577,6 +827,7 @@ class LocalDatabase {
         'messages',
         'api_profiles',
         'model_downloads',
+        'model_artifacts',
         'mcp_servers',
         'harness_plugins',
         'permission_audit',
@@ -584,6 +835,11 @@ class LocalDatabase {
         'mcp_catalog',
         'ai_teams',
         'ai_team_messages',
+        'harness_sessions',
+        'harness_events',
+        'tool_approvals',
+        'agent_executions',
+        'workspace_snapshots',
       ]) {
         final rows = (snapshot[table] as List? ?? const []).cast<Map>();
         for (final row in rows) {

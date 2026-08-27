@@ -2,7 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+// Legacy HTTP+SSE remains available only for explicitly configured older MCP
+// servers. New entries default to Streamable HTTP.
+// ignore_for_file: deprecated_member_use
+
 import 'package:dio/dio.dart';
+import 'package:mcp_dart/mcp_dart.dart' as mcp;
 
 import '../database/local_database.dart';
 import '../models/workbench_models.dart';
@@ -209,15 +214,16 @@ class McpService {
     final watch = Stopwatch()..start();
     try {
       final transport = server['transport'] as String? ?? 'http';
-      final tools = transport == 'stdio'
+      final result = transport == 'stdio'
           ? await _testStdio(server)
           : await _testHttp(server);
       watch.stop();
       return McpConnectionResult(
         success: true,
         serverName: server['name'] as String? ?? '',
-        tools: tools,
+        tools: result.tools,
         latency: watch.elapsed,
+        protocolVersion: result.protocolVersion,
       );
     } on Object catch (error) {
       watch.stop();
@@ -231,7 +237,32 @@ class McpService {
     }
   }
 
-  Future<List<McpToolDefinition>> _testHttp(Map<String, Object?> server) async {
+  Future<({List<McpToolDefinition> tools, String? protocolVersion})> _testHttp(
+    Map<String, Object?> server,
+  ) async {
+    final client = await _connectHttp(server);
+    try {
+      final result = await client.listTools().timeout(
+        const Duration(seconds: 20),
+      );
+      return (
+        tools: result.tools
+            .map(
+              (tool) => McpToolDefinition(
+                name: tool.name,
+                description: tool.description ?? '',
+                inputSchema: tool.inputSchema.toJson(),
+              ),
+            )
+            .toList(),
+        protocolVersion: client.getProtocolVersion(),
+      );
+    } finally {
+      await client.close();
+    }
+  }
+
+  Future<mcp.McpClient> _connectHttp(Map<String, Object?> server) async {
     final url = server['command_or_url']! as String;
     final custom =
         jsonDecode(server['config_json'] as String? ?? '{}')
@@ -239,38 +270,43 @@ class McpService {
     final headers = Map<String, String>.from(
       custom['headers'] as Map? ?? const {},
     );
-    final initialize = await _dio.post<Map<String, dynamic>>(
-      url,
-      data: _request(1, 'initialize', {
-        'protocolVersion': '2025-03-26',
-        'capabilities': const {},
-        'clientInfo': {'name': 'SIQI', 'version': '1.0.0'},
-      }),
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
-          ...headers,
-        },
+    final legacy = server['transport'] == 'sse';
+    final client = mcp.McpClient(
+      const mcp.Implementation(name: 'SIQI', version: '1.0.0-beta.1'),
+      options: mcp.McpClientOptions(
+        protocol: legacy ? mcp.McpProtocol.legacy : mcp.McpProtocol.stable,
       ),
     );
-    final sessionId = initialize.headers.value('mcp-session-id');
-    final response = await _dio.post<Map<String, dynamic>>(
-      url,
-      data: _request(2, 'tools/list', const {}),
-      options: Options(
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json, text/event-stream',
-          if (sessionId != null) 'Mcp-Session-Id': sessionId,
-          ...headers,
-        },
-      ),
-    );
-    return _parseTools(response.data);
+    try {
+      if (legacy) {
+        await client
+            .connect(
+              mcp.SseClientTransport(
+                Uri.parse(url),
+                opts: mcp.SseClientTransportOptions(headers: headers),
+              ),
+            )
+            .timeout(const Duration(seconds: 20));
+      } else {
+        await client
+            .connect(
+              mcp.StreamableHttpClientTransport(
+                Uri.parse(url),
+                opts: mcp.StreamableHttpClientTransportOptions(
+                  requestInit: {if (headers.isNotEmpty) 'headers': headers},
+                ),
+              ),
+            )
+            .timeout(const Duration(seconds: 20));
+      }
+      return client;
+    } on Object {
+      await client.close();
+      rethrow;
+    }
   }
 
-  Future<List<McpToolDefinition>> _testStdio(
+  Future<({List<McpToolDefinition> tools, String? protocolVersion})> _testStdio(
     Map<String, Object?> server,
   ) async {
     final command = server['command_or_url']! as String;
@@ -297,22 +333,54 @@ class McpService {
           _request(1, 'initialize', {
             'protocolVersion': '2025-03-26',
             'capabilities': const {},
-            'clientInfo': {'name': 'SIQI', 'version': '1.0.0'},
+            'clientInfo': {'name': 'SIQI', 'version': '1.0.0-beta.1'},
           }),
         ),
       );
       await process.stdin.flush();
-      await _waitFor(responses, 1);
+      final initialization = await _waitFor(responses, 1);
       process.stdin.writeln(
         jsonEncode({'jsonrpc': '2.0', 'method': 'notifications/initialized'}),
       );
       process.stdin.writeln(jsonEncode(_request(2, 'tools/list', const {})));
       await process.stdin.flush();
       final response = await _waitFor(responses, 2);
-      return _parseTools(response);
+      final initializationResult =
+          initialization['result'] as Map<String, dynamic>?;
+      return (
+        tools: _parseTools(response),
+        protocolVersion: initializationResult?['protocolVersion'] as String?,
+      );
     } finally {
       await subscription.cancel();
       process.kill();
+    }
+  }
+
+  Future<String> invokeTool(
+    Map<String, Object?> server, {
+    required String toolName,
+    required Map<String, dynamic> arguments,
+  }) async {
+    if (server['transport'] == 'stdio') {
+      throw UnsupportedError(
+        'Interactive stdio tool calls are available only through the developer shell.',
+      );
+    }
+    final client = await _connectHttp(server);
+    try {
+      final result = await client
+          .callTool(mcp.CallToolRequest(name: toolName, arguments: arguments))
+          .timeout(const Duration(minutes: 2));
+      await _database.addWorkLog(
+        category: 'mcp',
+        title: 'tool:$toolName',
+        detail: server['name'] as String? ?? '',
+        status: result.isError ? 'failed' : 'completed',
+      );
+      return const JsonEncoder.withIndent('  ').convert(result.toJson());
+    } finally {
+      await client.close();
     }
   }
 

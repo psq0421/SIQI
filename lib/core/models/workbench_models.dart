@@ -298,12 +298,14 @@ class McpConnectionResult {
     required this.tools,
     required this.latency,
     this.error,
+    this.protocolVersion,
   });
   final bool success;
   final String serverName;
   final List<McpToolDefinition> tools;
   final Duration latency;
   final String? error;
+  final String? protocolVersion;
 }
 
 class ShellQueueItem {

@@ -16,19 +16,21 @@ class ApiService {
     required double temperature,
     required double topP,
     required int maxTokens,
+    String? modelId,
     CancelToken? cancelToken,
   }) async* {
     if (profile.format == ApiFormat.local) {
       throw StateError('Local model must use the local inference service.');
     }
     final openAi = profile.format == ApiFormat.openAi;
+    final selectedModelId = profile.resolveModel(modelId);
     final endpoint = _join(
       profile.baseUrl,
       openAi ? 'chat/completions' : 'messages',
     );
     final data = openAi
         ? <String, Object?>{
-            'model': profile.modelId,
+            'model': selectedModelId,
             'messages': [
               {'role': 'system', 'content': systemPrompt},
               ...messages
@@ -49,7 +51,7 @@ class ApiService {
             'stream_options': {'include_usage': true},
           }
         : <String, Object?>{
-            'model': profile.modelId,
+            'model': selectedModelId,
             'system': systemPrompt,
             'messages': messages
                 .where((message) => message.role != MessageRole.system)
@@ -175,6 +177,7 @@ class ApiService {
     required double temperature,
     required double topP,
     required int maxTokens,
+    String? modelId,
     CancelToken? cancelToken,
   }) async {
     return switch (profile.format) {
@@ -186,6 +189,7 @@ class ApiService {
         temperature,
         topP,
         maxTokens,
+        profile.resolveModel(modelId),
         cancelToken,
       ),
       ApiFormat.anthropic => _anthropic(
@@ -196,6 +200,7 @@ class ApiService {
         temperature,
         topP,
         maxTokens,
+        profile.resolveModel(modelId),
         cancelToken,
       ),
       ApiFormat.local => throw StateError(
@@ -212,13 +217,14 @@ class ApiService {
     double temperature,
     double topP,
     int maxTokens,
+    String modelId,
     CancelToken? cancelToken,
   ) async {
     final endpoint = _join(profile.baseUrl, 'chat/completions');
     final response = await _dio.post<Map<String, dynamic>>(
       endpoint,
       data: {
-        'model': profile.modelId,
+        'model': modelId,
         'messages': [
           {'role': 'system', 'content': systemPrompt},
           ...messages
@@ -257,9 +263,11 @@ class ApiService {
     final usage = data['usage'] as Map<String, dynamic>? ?? const {};
     return CompletionResult(
       text,
-      TokenUsage(
-        input: usage['prompt_tokens'] as int? ?? 0,
-        output: usage['completion_tokens'] as int? ?? 0,
+      profile.applyBilling(
+        TokenUsage(
+          input: usage['prompt_tokens'] as int? ?? 0,
+          output: usage['completion_tokens'] as int? ?? 0,
+        ),
       ),
     );
   }
@@ -303,13 +311,14 @@ class ApiService {
     double temperature,
     double topP,
     int maxTokens,
+    String modelId,
     CancelToken? cancelToken,
   ) async {
     final endpoint = _join(profile.baseUrl, 'messages');
     final response = await _dio.post<Map<String, dynamic>>(
       endpoint,
       data: {
-        'model': profile.modelId,
+        'model': modelId,
         'system': systemPrompt,
         'messages': messages
             .where((message) => message.role != MessageRole.system)
@@ -347,9 +356,11 @@ class ApiService {
     final usage = data['usage'] as Map<String, dynamic>? ?? const {};
     return CompletionResult(
       text,
-      TokenUsage(
-        input: usage['input_tokens'] as int? ?? 0,
-        output: usage['output_tokens'] as int? ?? 0,
+      profile.applyBilling(
+        TokenUsage(
+          input: usage['input_tokens'] as int? ?? 0,
+          output: usage['output_tokens'] as int? ?? 0,
+        ),
       ),
     );
   }

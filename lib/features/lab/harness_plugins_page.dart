@@ -271,6 +271,9 @@ class _HarnessPluginsPageState extends ConsumerState<HarnessPluginsPage> {
                         downloading: _downloads.containsKey(
                           items[index].repositoryId,
                         ),
+                        showInstallCommand: ref
+                            .watch(settingsProvider)
+                            .developerMode,
                         onOpen: () => launchUrl(
                           Uri.parse(items[index].repositoryUrl),
                           mode: LaunchMode.externalApplication,
@@ -293,6 +296,7 @@ class _PluginCard extends StatelessWidget {
     required this.plugin,
     required this.progress,
     required this.downloading,
+    required this.showInstallCommand,
     required this.onOpen,
     required this.onDownload,
     required this.onUninstall,
@@ -301,6 +305,7 @@ class _PluginCard extends StatelessWidget {
   final HarnessPlugin plugin;
   final double? progress;
   final bool downloading;
+  final bool showInstallCommand;
   final VoidCallback onOpen;
   final VoidCallback onDownload;
   final VoidCallback onUninstall;
@@ -393,11 +398,12 @@ class _PluginCard extends StatelessWidget {
                   label: Text(context.l10n.downloadSourceArchive),
                 )
               else ...[
-                OutlinedButton.icon(
-                  onPressed: onCopyCommand,
-                  icon: const SiqiIcon(SiqiGlyph.copy, size: 18),
-                  label: Text(context.l10n.copyInstallCommand),
-                ),
+                if (showInstallCommand)
+                  OutlinedButton.icon(
+                    onPressed: onCopyCommand,
+                    icon: const SiqiIcon(SiqiGlyph.copy, size: 18),
+                    label: Text(context.l10n.copyInstallCommand),
+                  ),
                 TextButton.icon(
                   onPressed: onUninstall,
                   icon: const SiqiIcon(SiqiGlyph.close, size: 18),

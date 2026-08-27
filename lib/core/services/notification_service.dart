@@ -4,15 +4,28 @@ class NotificationService {
   final _plugin = FlutterLocalNotificationsPlugin();
   final _activeForegroundNotifications = <int>{};
   static const _downloadChannel = 'model_downloads';
+  Future<void>? _initializing;
+  bool _initialized = false;
 
-  Future<void> initialize() async {
-    const settings = InitializationSettings(
-      android: AndroidInitializationSettings('@drawable/ic_notification'),
-    );
-    await _plugin.initialize(settings);
+  Future<void> initialize() {
+    if (_initialized) return Future.value();
+    return _initializing ??= _initializeOnce();
+  }
+
+  Future<void> _initializeOnce() async {
+    try {
+      const settings = InitializationSettings(
+        android: AndroidInitializationSettings('@drawable/ic_notification'),
+      );
+      await _plugin.initialize(settings);
+      _initialized = true;
+    } finally {
+      _initializing = null;
+    }
   }
 
   Future<bool> requestPermission() async {
+    await initialize();
     final android = _plugin
         .resolvePlatformSpecificImplementation<
           AndroidFlutterLocalNotificationsPlugin
@@ -30,6 +43,7 @@ class NotificationService {
     required int max,
   }) async {
     try {
+      await initialize();
       final android = _plugin
           .resolvePlatformSpecificImplementation<
             AndroidFlutterLocalNotificationsPlugin
@@ -63,6 +77,7 @@ class NotificationService {
   }
 
   Future<void> cancel(int id) async {
+    await initialize();
     _activeForegroundNotifications.remove(id);
     await _plugin.cancel(id);
     if (_activeForegroundNotifications.isEmpty) {

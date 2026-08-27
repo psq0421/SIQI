@@ -27,10 +27,7 @@ class LabPage extends ConsumerWidget {
     final servers = ref.watch(mcpServersProvider);
     final localModels = ModelCatalog.models
         .where(
-          (model) =>
-              model.family == ModelFamily.local &&
-              model.isDeviceCompatible &&
-              model.downloadUrl != null,
+          (model) => model.family == ModelFamily.local && model.downloadable,
         )
         .length;
     final totalTokens = chat.profiles.fold<int>(

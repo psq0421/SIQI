@@ -21,6 +21,7 @@ class McpPage extends ConsumerStatefulWidget {
 class _McpPageState extends ConsumerState<McpPage> {
   final Map<String, McpConnectionResult> _results = {};
   final Set<String> _testing = {};
+  final Set<String> _invoking = {};
 
   Future<void> _test(Map<String, Object?> server) async {
     final id = server['id']! as String;
@@ -57,6 +58,108 @@ class _McpPageState extends ConsumerState<McpPage> {
         .read(localDatabaseProvider)
         .deleteMcpServer(server['id']! as String);
     ref.invalidate(mcpServersProvider);
+  }
+
+  Future<void> _invoke(
+    Map<String, Object?> server,
+    McpToolDefinition tool,
+  ) async {
+    final controller = TextEditingController(text: '{}');
+    final raw = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.invokeTool),
+        content: SizedBox(
+          width: 520,
+          child: TextField(
+            controller: controller,
+            minLines: 5,
+            maxLines: 12,
+            style: const TextStyle(fontFamily: 'monospace'),
+            decoration: InputDecoration(
+              labelText: context.l10n.toolArgumentsJson,
+              helperText: tool.name,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: Text(context.l10n.continueLabel),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (raw == null || !mounted) return;
+    late final Map<String, dynamic> arguments;
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) throw const FormatException();
+      arguments = Map<String, dynamic>.from(decoded);
+    } on Object {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.invalidJsonObject)));
+      return;
+    }
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        icon: const SiqiIcon(SiqiGlyph.shield, size: 34),
+        title: Text(context.l10n.approveToolCall),
+        content: Text(context.l10n.approveToolCallBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(context.l10n.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(context.l10n.confirmExecute),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted) return;
+    final invocationId = '${server['id']}/${tool.name}';
+    setState(() => _invoking.add(invocationId));
+    try {
+      final output = await ref
+          .read(mcpServiceProvider)
+          .invokeTool(server, toolName: tool.name, arguments: arguments);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(context.l10n.toolResult),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(child: SelectableText(output)),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(context.l10n.done),
+            ),
+          ],
+        ),
+      );
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.toolCallFailed(error.toString())),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _invoking.remove(invocationId));
+    }
   }
 
   @override
@@ -113,7 +216,9 @@ class _McpPageState extends ConsumerState<McpPage> {
                       server: server,
                       result: _results[id],
                       testing: _testing.contains(id),
+                      invoking: _invoking,
                       onTest: () => _test(server),
+                      onInvoke: (tool) => _invoke(server, tool),
                       onEdit: () => _edit(context, server),
                       onDelete: () => _delete(server),
                     );
@@ -145,14 +250,18 @@ class _ServerCard extends StatelessWidget {
     required this.server,
     required this.result,
     required this.testing,
+    required this.invoking,
     required this.onTest,
+    required this.onInvoke,
     required this.onEdit,
     required this.onDelete,
   });
   final Map<String, Object?> server;
   final McpConnectionResult? result;
   final bool testing;
+  final Set<String> invoking;
   final VoidCallback onTest;
+  final Future<void> Function(McpToolDefinition tool) onInvoke;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -257,6 +366,13 @@ class _ServerCard extends StatelessWidget {
                         context.l10n.toolsDiscovered(result!.tools.length),
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
+                      if (result!.protocolVersion != null)
+                        Text(
+                          context.l10n.protocolVersion(
+                            result!.protocolVersion!,
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
                       if (result!.tools.isEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 4),
@@ -274,6 +390,31 @@ class _ServerCard extends StatelessWidget {
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                             ),
+                            trailing: transport == 'stdio'
+                                ? null
+                                : IconButton(
+                                    tooltip: context.l10n.invokeTool,
+                                    onPressed:
+                                        invoking.contains(
+                                          '${server['id']}/${tool.name}',
+                                        )
+                                        ? null
+                                        : () => onInvoke(tool),
+                                    icon:
+                                        invoking.contains(
+                                          '${server['id']}/${tool.name}',
+                                        )
+                                        ? const SizedBox.square(
+                                            dimension: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const SiqiIcon(
+                                            SiqiGlyph.play,
+                                            size: 18,
+                                          ),
+                                  ),
                           ),
                     ],
                   ],
