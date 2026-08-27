@@ -17,9 +17,6 @@ Source license: MIT License
 - Compresses bundled llama.cpp, ONNX Runtime, and Sherpa-ONNX native libraries. Android extracts them at installation time without changing inference output or model compatibility.
 - Removes an unused code-generation chain and redundant direct dependencies to simplify dependency resolution and builds.
 - The Release APK drops from Alpha3's 247.5 MB to 39.2 MiB, an approximately 84.2% reduction. Debug remains much larger because it retains debugging symbols and development runtimes.
-
-### Alpha3 (build 4005)
-
 - A fresh install creates app-specific `Projects`, `Models`, `Exports`, `Logs`, and `Cache` directories and initializes workspace/model paths to locations that are immediately writable, fixing the first-run false “folder not writable” result.
 - Permissions now include legacy file read/write and optional all-files access. The latter opens Android's dedicated settings page only after an explicit user action; it is never forced at startup. Root remains unsupported.
 - The physical-memory guard for local inference, TTS, and ASR is raised from 60% to 85%.
