@@ -37,73 +37,9 @@ Flutter：stable 3.47.0 或更高兼容版本
 
 ## 当前实现
 
-### 拿AI简单做了个图解，凑活看吧
+### 图示，凑活看吧
 <img width="1400" height="820" alt="download" src="https://github.com/user-attachments/assets/06c49132-2323-49d4-90a3-2f1531db092f" /><svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
-  <title id="title">SIQI four-layer work mechanism</title>
-  <desc id="desc">A four-layer diagram showing interaction, orchestration, execution, and local data and safety mechanisms.</desc>
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fbfcff"/><stop offset="1" stop-color="#edf2ff"/></linearGradient>
-    <linearGradient id="top" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#315efb"/><stop offset="1" stop-color="#5b55e8"/></linearGradient>
-    <linearGradient id="middle" x1="0" y1="0" x2="1" y2="0"><stop stop-color="#784fd4"/><stop offset="1" stop-color="#ad4bc2"/></linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="7" stdDeviation="9" flood-color="#233660" flood-opacity=".13"/></filter>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="#7284ac"/></marker>
-    <style>
-      .font{font-family:Inter,Arial,sans-serif}
-      .title{font-size:31px;font-weight:700;fill:#17203b}
-      .sub{font-size:17px;fill:#5e6c8d}
-      .layer{font-size:20px;font-weight:700;fill:#17203b}
-      .node{font-size:17px;font-weight:700;fill:#17203b}
-      .detail{font-size:14px;fill:#5e6c8d}
-      .white{fill:#fff}
-    </style>
-  </defs>
-  <rect width="1400" height="820" rx="32" fill="url(#bg)"/>
-  <text x="66" y="61" class="font title">司器 SIQI · 四层工作机制</text>
-  <text x="66" y="94" class="font sub">从用户意图到本地结果：每一层都有明确边界、确认点和可追溯记录。</text>
-
-  <rect x="55" y="130" width="1290" height="145" rx="24" fill="#e7edff"/>
-  <text x="82" y="166" class="font layer">第一层 · 交互入口层 / Interaction</text>
-  <g filter="url(#shadow)">
-    <rect x="82" y="188" width="226" height="65" rx="16" fill="white"/><text x="195" y="216" text-anchor="middle" class="font node">对话输入</text><text x="195" y="239" text-anchor="middle" class="font detail">文本 · 图片 · 语音</text>
-    <rect x="337" y="188" width="226" height="65" rx="16" fill="white"/><text x="450" y="216" text-anchor="middle" class="font node">模式选择</text><text x="450" y="239" text-anchor="middle" class="font detail">Chat · Agent · Harness · MCP</text>
-    <rect x="592" y="188" width="226" height="65" rx="16" fill="white"/><text x="705" y="216" text-anchor="middle" class="font node">模型与供应商</text><text x="705" y="239" text-anchor="middle" class="font detail">本地模型 · API · AI Team</text>
-    <rect x="847" y="188" width="226" height="65" rx="16" fill="white"/><text x="960" y="216" text-anchor="middle" class="font node">工作区选择</text><text x="960" y="239" text-anchor="middle" class="font detail">Projects · 文件附件</text>
-    <rect x="1102" y="188" width="216" height="65" rx="16" fill="white"/><text x="1210" y="216" text-anchor="middle" class="font node">用户确认</text><text x="1210" y="239" text-anchor="middle" class="font detail">权限 · 写入 · 高危操作</text>
-  </g>
-
-  <rect x="55" y="300" width="1290" height="175" rx="24" fill="#f0eaff"/>
-  <text x="82" y="336" class="font layer">第二层 · 任务编排层 / Orchestration</text>
-  <g filter="url(#shadow)">
-    <rect x="82" y="358" width="250" height="82" rx="16" fill="url(#top)"/><text x="207" y="392" text-anchor="middle" class="font node white">请求预检</text><text x="207" y="417" text-anchor="middle" class="font white" font-size="14">网络 · 模型 · 权限 · 内存</text>
-    <rect x="380" y="358" width="250" height="82" rx="16" fill="url(#top)"/><text x="505" y="392" text-anchor="middle" class="font node white">上下文组装</text><text x="505" y="417" text-anchor="middle" class="font white" font-size="14">历史 · 文件 · 系统提示词</text>
-    <rect x="678" y="358" width="250" height="82" rx="16" fill="url(#middle)"/><text x="803" y="392" text-anchor="middle" class="font node white">计划与路由</text><text x="803" y="417" text-anchor="middle" class="font white" font-size="14">工具调用 · 多模型协作</text>
-    <rect x="976" y="358" width="250" height="82" rx="16" fill="url(#middle)"/><text x="1101" y="392" text-anchor="middle" class="font node white">流式任务控制</text><text x="1101" y="417" text-anchor="middle" class="font white" font-size="14">暂停 · 终止 · 超时保护</text>
-  </g>
-  <path d="M332 399H370M630 399H668M928 399H966" stroke="#7284ac" stroke-width="4" marker-end="url(#arrow)"/>
-
-  <rect x="55" y="500" width="1290" height="145" rx="24" fill="#fff0f3"/>
-  <text x="82" y="536" class="font layer">第三层 · 执行引擎层 / Execution</text>
-  <g filter="url(#shadow)">
-    <rect x="82" y="558" width="226" height="65" rx="16" fill="white"/><text x="195" y="586" text-anchor="middle" class="font node">端侧推理</text><text x="195" y="609" text-anchor="middle" class="font detail">llama.cpp · GGUF</text>
-    <rect x="337" y="558" width="226" height="65" rx="16" fill="white"/><text x="450" y="586" text-anchor="middle" class="font node">多模态引擎</text><text x="450" y="609" text-anchor="middle" class="font detail">TTS · ASR · OCR · 视觉</text>
-    <rect x="592" y="558" width="226" height="65" rx="16" fill="white"/><text x="705" y="586" text-anchor="middle" class="font node">开发工具</text><text x="705" y="609" text-anchor="middle" class="font detail">Harness · MCP · Shell</text>
-    <rect x="847" y="558" width="226" height="65" rx="16" fill="white"/><text x="960" y="586" text-anchor="middle" class="font node">远程连接</text><text x="960" y="609" text-anchor="middle" class="font detail">API · LAN Gateway</text>
-    <rect x="1102" y="558" width="216" height="65" rx="16" fill="white"/><text x="1210" y="586" text-anchor="middle" class="font node">结果回传</text><text x="1210" y="609" text-anchor="middle" class="font detail">文本 · 文件 · 音频</text>
-  </g>
-
-  <rect x="55" y="670" width="1290" height="105" rx="24" fill="#fff4df"/>
-  <text x="82" y="706" class="font layer">第四层 · 数据与安全层 / Data &amp; Safety</text>
-  <g filter="url(#shadow)">
-    <rect x="388" y="687" width="210" height="62" rx="15" fill="white"/><text x="493" y="714" text-anchor="middle" class="font node">本地持久化</text><text x="493" y="735" text-anchor="middle" class="font detail">SQLite · 加密密钥 · 导出</text>
-    <rect x="622" y="687" width="210" height="62" rx="15" fill="white"/><text x="727" y="714" text-anchor="middle" class="font node">边界与权限</text><text x="727" y="735" text-anchor="middle" class="font detail">Scoped Storage · 审计</text>
-    <rect x="856" y="687" width="210" height="62" rx="15" fill="white"/><text x="961" y="714" text-anchor="middle" class="font node">工作日志</text><text x="961" y="735" text-anchor="middle" class="font detail">缓存 · 错误 · 可清理</text>
-  </g>
-  <path d="M700 475V490M700 645V660" stroke="#7284ac" stroke-width="4" marker-end="url(#arrow)"/>
-  <text x="1010" y="795" class="font sub">显式网络 · 本地优先 · 可审计 · 可恢复</text>
-</svg>
-
-
-
+ 
 ### 对话工作台
 
 - Chat：标准问答、会话历史、本地搜索、流式响应、附件能力检测。
