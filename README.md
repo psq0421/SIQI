@@ -1,5 +1,6 @@
 # 司器（SIQI）
 English：[README_EN.md](https://github.com/psq0421/SIQI/edit/master/README_EN.md)
+<img width="128" height="128" alt="8efac9b20e5f077607c5847706c7af33" src="https://github.com/user-attachments/assets/84e5fb61-2804-4cb6-a98e-a9fecf508c48" />
 
 司器是一款面向 Android 的端侧优先 AI 工作站。会话、配置、API 密钥、模型记录、工作区信息、权限审计、工作日志和缓存索引均保存在本机；联网只用于用户明确配置的 API、模型下载、MCP 目录同步、GitHub 导入和官方资源访问。
 
