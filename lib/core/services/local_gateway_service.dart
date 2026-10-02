@@ -3,19 +3,33 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
 
 /// Optional LAN-only control endpoint. It is disabled by default and exposes
 /// read-only health/model endpoints until an authenticated request is made.
 class LocalGatewayService {
-  LocalGatewayService(this._storage);
+  LocalGatewayService(this._storage, this._preferences);
   final FlutterSecureStorage _storage;
+  final SharedPreferences _preferences;
   HttpServer? _server;
   String? _token;
   static const _tokenKey = 'gateway_token';
 
   bool get running => _server != null;
   int? get port => _server == null ? null : 1158;
+
+  bool option(String key, {bool fallback = true}) =>
+      _preferences.getBool('gateway_$key') ?? fallback;
+  Future<void> setOption(String key, bool value) =>
+      _preferences.setBool('gateway_$key', value);
+  int get maxConcurrentJobs => _preferences.getInt('gateway_max_jobs') ?? 1;
+  Future<void> setMaxConcurrentJobs(int value) =>
+      _preferences.setInt('gateway_max_jobs', value.clamp(1, 8));
+  int get requestTimeoutSeconds =>
+      _preferences.getInt('gateway_timeout') ?? 120;
+  Future<void> setRequestTimeoutSeconds(int value) =>
+      _preferences.setInt('gateway_timeout', value.clamp(10, 1800));
 
   Future<String> ensureToken() async {
     final existing = await _storage.read(key: _tokenKey);
@@ -73,8 +87,17 @@ class LocalGatewayService {
       await request.response.close();
       return;
     }
-    if (path == '/api/models' && request.method == 'GET') {
+    if (path == '/api/models' &&
+        request.method == 'GET' &&
+        option('allowModelList')) {
       request.response.write(jsonEncode({'models': const <Object>[]}));
+    } else if (path == '/api/chat' &&
+        request.method == 'POST' &&
+        option('allowRemoteChat')) {
+      request.response.statusCode = HttpStatus.notImplemented;
+      request.response.write(
+        jsonEncode({'error': 'local-chat-dispatch-not-configured'}),
+      );
     } else {
       request.response.statusCode = HttpStatus.notFound;
       request.response.write(jsonEncode({'error': 'not-found'}));
@@ -83,6 +106,7 @@ class LocalGatewayService {
   }
 
   bool _authorized(HttpRequest request) {
+    if (!option('requireToken')) return true;
     final supplied =
         request.headers.value('x-siqi-token') ??
         request.uri.queryParameters['token'];

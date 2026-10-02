@@ -33,6 +33,7 @@ import '../services/secure_key_service.dart';
 import '../services/shell_service.dart';
 import '../services/tts_service.dart';
 import '../services/workspace_service.dart';
+import '../services/external_model_service.dart';
 import '../services/runtime_spill_service.dart';
 import '../services/local_gateway_service.dart';
 
@@ -61,6 +62,15 @@ final dioProvider = Provider<Dio>(
 final preferencesServiceProvider = Provider(
   (ref) => PreferencesService(ref.watch(sharedPreferencesProvider)),
 );
+final externalModelServiceProvider = Provider(
+  (ref) => ExternalModelService(
+    ref.watch(sharedPreferencesProvider),
+    ref.watch(localDatabaseProvider),
+  ),
+);
+final externalModelsProvider = Provider<List<ExternalModelRecord>>(
+  (ref) => ref.watch(externalModelServiceProvider).list(),
+);
 final secureKeyServiceProvider = Provider(
   (ref) => const SecureKeyService(
     FlutterSecureStorage(
@@ -83,7 +93,10 @@ final permissionServiceProvider = Provider(
 final cacheServiceProvider = Provider((ref) => const CacheService());
 final runtimeSpillServiceProvider = Provider((ref) => RuntimeSpillService());
 final localGatewayServiceProvider = Provider(
-  (ref) => LocalGatewayService(ref.watch(secureKeyServiceProvider).storage),
+  (ref) => LocalGatewayService(
+    ref.watch(secureKeyServiceProvider).storage,
+    ref.watch(sharedPreferencesProvider),
+  ),
 );
 final fileContentServiceProvider = Provider((ref) => FileContentService());
 final ttsServiceProvider = Provider((ref) {

@@ -122,6 +122,31 @@ class _DataStorageSettingsPageState
     }
   }
 
+  Future<void> _importModel() async {
+    try {
+      final record = await ref
+          .read(externalModelServiceProvider)
+          .pickAndImport();
+      ref.invalidate(externalModelsProvider);
+      if (mounted && record != null) {
+        await ref
+            .read(settingsProvider.notifier)
+            .update((current) => current.copyWith(selectedModelId: record.id));
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Imported ${record.name}')));
+        }
+      }
+    } on Object catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Model import failed: $error')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
@@ -225,6 +250,16 @@ class _DataStorageSettingsPageState
                   title: Text(context.l10n.importData),
                   trailing: const SiqiIcon(SiqiGlyph.chevronRight, size: 18),
                   onTap: _import,
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.memory_rounded),
+                  title: const Text('Import local model file'),
+                  subtitle: const Text(
+                    'GGUF, GGML, BIN, SafeTensors, MNN, ONNX, TFLite',
+                  ),
+                  trailing: const SiqiIcon(SiqiGlyph.chevronRight, size: 18),
+                  onTap: _importModel,
                 ),
               ],
             ),

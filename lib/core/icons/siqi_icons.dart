@@ -102,20 +102,29 @@ class SiqiBrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: background ?? colors.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(size * .24),
-        border: Border.all(color: colors.outlineVariant),
-      ),
-      alignment: Alignment.center,
-      child: SiqiIcon(
-        SiqiGlyph.brand,
-        size: size * .66,
-        color: foreground ?? colors.primary,
-        strokeWidth: 2.15,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * .24),
+      child: Image.asset(
+        'assets/branding/siqi_brand.jpg',
+        width: size,
+        height: size,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stack) => Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            color: background ?? colors.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(size * .24),
+            border: Border.all(color: colors.outlineVariant),
+          ),
+          alignment: Alignment.center,
+          child: SiqiIcon(
+            SiqiGlyph.brand,
+            size: size * .66,
+            color: foreground ?? colors.primary,
+            strokeWidth: 2.15,
+          ),
+        ),
       ),
     );
   }

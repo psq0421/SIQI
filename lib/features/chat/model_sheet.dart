@@ -129,6 +129,18 @@ class ModelSheet extends ConsumerWidget {
                       onTap: () => _selectModel(context, ref, model),
                     ),
                   ),
+              if (ref.watch(externalModelsProvider).isNotEmpty) ...[
+                const SizedBox(height: 18),
+                _SectionTitle(icon: SiqiGlyph.folder, title: 'Imported files'),
+                ...ref.watch(externalModelsProvider).map((record) {
+                  final model = ModelCatalog.byId(record.id);
+                  return _ModelTile(
+                    model: model,
+                    selected: selected == model.id,
+                    onTap: () => _selectModel(context, ref, model),
+                  );
+                }),
+              ],
             ],
           ],
         ),

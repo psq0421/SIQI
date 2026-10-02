@@ -44,6 +44,8 @@ dev_dependencies:
 flutter:
   uses-material-design: true
   generate: true
+  assets:
+    - assets/branding/siqi_brand.jpg
 
 hooks:
   user_defines:

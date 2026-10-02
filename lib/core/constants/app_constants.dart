@@ -16,10 +16,10 @@ abstract final class AppConstants {
   static const harnessPluginCatalogUrl =
       'https://dsh.deepseek404.com/index.php';
   static const harnessNpmTarballUrl =
-      'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.1.1-rc.2.tgz';
+      'https://registry.npmjs.org/@deepseek-ai/dsh/-/dsh-0.2.0-rc.2.tgz';
   static const harnessNpmSha512 =
-      'UP1UIh6q3Gme/yXRn/QL2P8IsVlv8Shpg22TRJIZPsCRWLm4CBiA1MUvXmJAfsOEETBMLAl+xWPtFw6ICsN3wg==';
-  static const harnessVersion = '0.1.1-rc.2';
+      'EAJ3gPNcVt/uv8X19PMm9NkVhWgT7xXNMk0UKCVm+IQ5rpSQOcsMUa0HWlnYYVybKMsccjcRB21vVVsaXQ6IdA==';
+  static const harnessVersion = '0.2.0-rc.2';
 
   static const supportedTextExtensions = <String>{
     'dart',
@@ -467,6 +467,40 @@ abstract final class ModelCatalog {
       license: 'Check official model card',
       task: ModelTask.chat,
       sourceUrl: 'https://huggingface.co/models?search=gpt-oss-20b',
+    ),
+    ModelDefinition(
+      id: 'local-gpt-oss-20b-q4km',
+      displayName: 'GPT-OSS-20B MoE · Q4_K_M',
+      family: ModelFamily.local,
+      provider: 'Unsloth quantization · ModelScope',
+      apiFormat: ApiFormat.local,
+      license: 'Apache-2.0',
+      isMultimodal: false,
+      sizeBytes: 11624759488,
+      minimumMemoryGb: 16,
+      downloadUrl:
+          'https://modelscope.cn/models/unsloth/gpt-oss-20b-GGUF/resolve/master/gpt-oss-20b-Q4_K_M.gguf',
+      sourceUrl: 'https://modelscope.cn/models/unsloth/gpt-oss-20b-GGUF',
+      expectedSha256:
+          'c27536640e410032865dc68781d80a08b98f8db5e93575919af8ccc0568aeb4f',
+      quantization: 'Q4_K_M',
+    ),
+    ModelDefinition(
+      id: 'local-qwen3-8b-q4km',
+      displayName: 'Qwen3-8B · Q4_K_M',
+      family: ModelFamily.local,
+      provider: 'Qwen quantization · ModelScope',
+      apiFormat: ApiFormat.local,
+      license: 'Apache-2.0',
+      isMultimodal: false,
+      sizeBytes: 5027783488,
+      minimumMemoryGb: 8,
+      downloadUrl:
+          'https://modelscope.cn/models/Qwen/Qwen3-8B-GGUF/resolve/master/Qwen3-8B-Q4_K_M.gguf',
+      sourceUrl: 'https://modelscope.cn/models/Qwen/Qwen3-8B-GGUF',
+      expectedSha256:
+          'd98cdcbd03e17ce47681435b5150e34c1417f50b5c0019dd560e4882c5745785',
+      quantization: 'Q4_K_M',
     ),
     ModelDefinition.compatibilityTarget(
       id: 'target-qwen-dense-7-9b',
@@ -1028,8 +1062,30 @@ abstract final class ModelCatalog {
     ),
   ];
 
-  static ModelDefinition byId(String id) =>
-      models.firstWhere((model) => model.id == id, orElse: () => models.first);
+  static ModelDefinition byId(String id) {
+    final existing = models.where((model) => model.id == id);
+    if (existing.isNotEmpty) return existing.first;
+    if (id.startsWith('imported:')) {
+      final encoded = id.substring('imported:'.length);
+      final label = Uri.decodeComponent(encoded).split(':').last;
+      return ModelDefinition(
+        id: id,
+        displayName: 'Imported · $label',
+        family: ModelFamily.local,
+        provider: 'External file',
+        apiFormat: ApiFormat.local,
+        license: 'User supplied',
+        isMultimodal: false,
+        sizeBytes: 1,
+        minimumMemoryGb: 1,
+        downloadUrl: 'file://$encoded',
+        expectedSha256:
+            '0000000000000000000000000000000000000000000000000000000000000000',
+        sourceUrl: null,
+      );
+    }
+    return models.first;
+  }
 }
 
 abstract final class ProviderTemplates {
