@@ -6,10 +6,31 @@ Application ID: `com.psq.siqi`
 Minimum OS: Android 10 (API 29)  
 Current target: Android 17 (API 37)  
 Flutter: stable 3.47.0 or a compatible newer release  
-Current version: `1.0.0-beta.1+4006`  
+Current version: `1.0.0-beta.2+4100`
 Source license: MIT License
 
 > The MIT license permits personal and commercial use. Models, MCP services, Harness runtimes, and other third-party resources remain subject to their own licenses and terms.
+
+<p align="center">
+  <img src="assets/branding/siqi_brand.jpg" alt="SIQI brand image" width="180">
+</p>
+
+<p align="center"><em>A local-first AI workstation: models, sessions, workspaces, and logs stay on the device whenever possible.</em></p>
+
+![SIQI local-first architecture](docs/images/siqi-architecture.svg)
+
+![SIQI workflow from prompt to local result](docs/images/siqi-workflows.svg)
+
+The diagrams summarize SIQI's two core principles: local inference and local data by default; network access is used only when the user explicitly configures an API, model download, MCP source, or GitHub import.
+
+### Beta2 (build 4100)
+
+- Harness plugins are now imported and managed locally, with external discovery links for the GitHub topic and Chinese plugin site.
+- Fixed the local runtime entry, system camera permission flow, and `com.android.camera` fallback.
+- Promoted Harness to the top of Laboratory, removed the workstation overview, and localized LAN Gateway controls.
+- Added GPT‑OSS‑20B and Qwen3‑8B quantized model entries plus broad external model-file import.
+
+See [`CHANGELOG_BETA2.md`](CHANGELOG_BETA2.md) for the complete release notes.
 
 ### Beta1 (build 4006)
 

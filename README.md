@@ -6,10 +6,31 @@
 最低版本：Android 10（API 29）  
 当前目标版本：Android 17（API 37）  
 Flutter：stable 3.47.0 或更高兼容版本  
-当前版本：`1.0.0-beta.1+4006`  
+当前版本：`1.0.0-beta.2+4100`
 源代码许可：MIT License
 
 > MIT 许可允许个人及商业使用。模型、MCP 服务、Harness 运行包和其他第三方资源仍分别受其自身许可证与服务条款约束。
+
+<p align="center">
+  <img src="assets/branding/siqi_brand.jpg" alt="司器 SIQI 品牌图" width="180">
+</p>
+
+<p align="center"><em>端侧优先的 AI 工作站：模型、会话、工作区和日志尽可能留在设备本地。</em></p>
+
+![司器本地优先架构](docs/images/siqi-architecture.svg)
+
+![司器工作流：从提示到本地结果](docs/images/siqi-workflows.svg)
+
+上面的配图概括了司器的两条核心原则：本地推理与本地数据优先；网络只在用户明确配置 API、模型下载、MCP 或 GitHub 导入时使用。
+
+### Beta2（build 4100）
+
+- Harness 插件改为本地导入与管理，并提供 GitHub 主题页和中文插件站外链。
+- 修复本地运行时入口、系统相机权限和 `com.android.camera` 调用回退。
+- 将 Harness 置于实验室顶部，移除工作站概览，完成 LAN Gateway 中文化。
+- 增加 GPT‑OSS‑20B、Qwen3‑8B 量化模型入口和多种外部模型格式导入。
+
+完整变更记录见 [`CHANGELOG_BETA2.md`](CHANGELOG_BETA2.md)。
 
 ### Beta1（build 4006）
 
