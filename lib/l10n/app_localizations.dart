@@ -2330,8 +2330,98 @@ abstract class AppLocalizations {
   /// No description provided for @harnessPluginCatalog.
   ///
   /// In zh, this message translates to:
-  /// **'Harness 插件目录'**
+  /// **'Harness 插件管理'**
   String get harnessPluginCatalog;
+
+  /// No description provided for @harnessPluginManagement.
+  ///
+  /// In zh, this message translates to:
+  /// **'Harness 插件管理'**
+  String get harnessPluginManagement;
+
+  /// No description provided for @harnessImportLocalPlugin.
+  ///
+  /// In zh, this message translates to:
+  /// **'导入本地插件'**
+  String get harnessImportLocalPlugin;
+
+  /// No description provided for @harnessBrowseGithubPlugins.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览 GitHub 插件'**
+  String get harnessBrowseGithubPlugins;
+
+  /// No description provided for @harnessBrowseChinesePlugins.
+  ///
+  /// In zh, this message translates to:
+  /// **'浏览中文插件站'**
+  String get harnessBrowseChinesePlugins;
+
+  /// No description provided for @harnessLocalPlugins.
+  ///
+  /// In zh, this message translates to:
+  /// **'本地插件'**
+  String get harnessLocalPlugins;
+
+  /// No description provided for @harnessNoLocalPlugins.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无本地插件'**
+  String get harnessNoLocalPlugins;
+
+  /// No description provided for @harnessImportHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'可导入 ZIP、TGZ、TAR.GZ、DSH 或 JSON 插件归档，也可以前往外部站点自行查找。'**
+  String get harnessImportHint;
+
+  /// No description provided for @harnessPluginImported.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件已导入本地'**
+  String get harnessPluginImported;
+
+  /// No description provided for @harnessPluginImportFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'插件导入失败：{reason}'**
+  String harnessPluginImportFailed(String reason);
+
+  /// No description provided for @harnessDeleteLocalPlugin.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除本地插件'**
+  String get harnessDeleteLocalPlugin;
+
+  /// No description provided for @harnessExternalPluginWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'外部插件未经司器审核，请在运行前自行检查来源、许可证和脚本内容。'**
+  String get harnessExternalPluginWarning;
+
+  /// No description provided for @searchLocalPlugins.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索本地插件'**
+  String get searchLocalPlugins;
+
+  /// No description provided for @harnessOpenRuntimeFile.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看本地运行时文件'**
+  String get harnessOpenRuntimeFile;
+
+  /// No description provided for @harnessRuntimeNotDownloaded.
+  ///
+  /// In zh, this message translates to:
+  /// **'请先下载运行时安装包。'**
+  String get harnessRuntimeNotDownloaded;
+
+  /// No description provided for @harnessRuntimePath.
+  ///
+  /// In zh, this message translates to:
+  /// **'本地运行时文件路径'**
+  String get harnessRuntimePath;
 
   /// No description provided for @developmentDocs.
   ///

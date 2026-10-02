@@ -661,7 +661,7 @@ class LocalDatabase {
 
   Future<int> harnessPluginCount() async {
     final rows = await _database.rawQuery(
-      'SELECT COUNT(*) AS count FROM harness_plugins',
+      'SELECT COUNT(*) AS count FROM harness_plugins WHERE archive_path IS NOT NULL',
     );
     return Sqflite.firstIntValue(rows) ?? 0;
   }
@@ -675,16 +675,17 @@ class LocalDatabase {
     final rows = normalized.isEmpty
         ? await _database.query(
             'harness_plugins',
-            orderBy: 'archive_path IS NOT NULL DESC, name COLLATE NOCASE',
+            where: 'archive_path IS NOT NULL',
+            orderBy: 'name COLLATE NOCASE',
             limit: limit,
             offset: offset,
           )
         : await _database.query(
             'harness_plugins',
             where:
-                'name LIKE ? OR owner LIKE ? OR description LIKE ? OR category LIKE ?',
+                '(name LIKE ? OR owner LIKE ? OR description LIKE ? OR category LIKE ?) AND archive_path IS NOT NULL',
             whereArgs: List.filled(4, '%$normalized%'),
-            orderBy: 'archive_path IS NOT NULL DESC, name COLLATE NOCASE',
+            orderBy: 'name COLLATE NOCASE',
             limit: limit,
             offset: offset,
           );
@@ -762,6 +763,12 @@ class LocalDatabase {
         where: 'repository_id = ?',
         whereArgs: [repositoryId],
       );
+
+  Future<void> deleteHarnessPlugin(String repositoryId) => _database.delete(
+    'harness_plugins',
+    where: 'repository_id = ?',
+    whereArgs: [repositoryId],
+  );
 
   Future<List<AiTeam>> listAiTeams() async {
     final rows = await _database.query('ai_teams', orderBy: 'updated_at DESC');

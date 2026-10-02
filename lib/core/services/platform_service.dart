@@ -111,4 +111,9 @@ class PlatformService {
     final path = await _channel.invokeMethod<String>('captureWithSystemCamera');
     return path;
   }
+
+  Future<bool> openFile(String path) async {
+    return await _channel.invokeMethod<bool>('openFile', {'path': path}) ??
+        false;
+  }
 }

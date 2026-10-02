@@ -72,6 +72,43 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
     }
   }
 
+  Future<void> _openRuntimeFile() async {
+    final archive = await ref
+        .read(deepSeekHarnessServiceProvider)
+        .runtimeArchive();
+    if (!mounted) return;
+    if (archive == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.harnessRuntimeNotDownloaded)),
+      );
+      return;
+    }
+    final opened = await ref
+        .read(platformServiceProvider)
+        .openFile(archive.path);
+    if (!mounted || opened) return;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(context.l10n.harnessRuntimePath),
+        content: SelectableText(archive.path),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: archive.path));
+              if (dialogContext.mounted) Navigator.pop(dialogContext);
+            },
+            child: Text(context.l10n.copy),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(context.l10n.close),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _pickWorkspace() async {
     final path = await FilePicker.platform.getDirectoryPath();
     if (path == null) return;
@@ -239,7 +276,9 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
                                   ),
                                 ),
                                 icon: const SiqiIcon(SiqiGlyph.market),
-                                label: Text(context.l10n.harnessPluginCatalog),
+                                label: Text(
+                                  context.l10n.harnessPluginManagement,
+                                ),
                               ),
                               OutlinedButton.icon(
                                 onPressed: () => launchUrl(
@@ -260,12 +299,11 @@ class _HarnessPageState extends ConsumerState<HarnessPage> {
                                 label: Text(context.l10n.repository),
                               ),
                               OutlinedButton.icon(
-                                onPressed: () => launchUrl(
-                                  Uri.parse('http://127.0.0.1:3080'),
-                                  mode: LaunchMode.externalApplication,
-                                ),
+                                onPressed: _openRuntimeFile,
                                 icon: const SiqiIcon(SiqiGlyph.play),
-                                label: Text(context.l10n.openLocalHarness),
+                                label: Text(
+                                  context.l10n.harnessOpenRuntimeFile,
+                                ),
                               ),
                             ],
                           ),

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/constants/app_constants.dart';
 import '../../core/icons/siqi_icons.dart';
-import '../../core/models/app_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../core/theme/siqi_design.dart';
 import '../../l10n/l10n.dart';
@@ -22,18 +20,7 @@ class LabPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final chat = ref.watch(chatProvider);
     final settings = ref.watch(settingsProvider);
-    final servers = ref.watch(mcpServersProvider);
-    final localModels = ModelCatalog.models
-        .where(
-          (model) => model.family == ModelFamily.local && model.downloadable,
-        )
-        .length;
-    final totalTokens = chat.profiles.fold<int>(
-      0,
-      (sum, item) => sum + item.inputTokens + item.outputTokens,
-    );
     final items = <_LabItem>[
       _LabItem(
         context.l10n.modelMarket,
@@ -64,12 +51,6 @@ class LabPage extends ConsumerWidget {
         context.l10n.aiTeamDescription,
         SiqiGlyph.queue,
         const TeamPage(),
-      ),
-      _LabItem(
-        context.l10n.harnessDashboard,
-        context.l10n.harnessDescription,
-        SiqiGlyph.harness,
-        const HarnessPage(),
       ),
       if (settings.developerMode)
         _LabItem(
@@ -103,87 +84,40 @@ class LabPage extends ConsumerWidget {
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
                 sliver: SliverToBoxAdapter(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SiqiSectionHeader(
-                        title: context.l10n.labOverview,
-                        subtitle:
-                            settings.activeWorkspacePath ??
-                            context.l10n.noWorkspaceSelected,
-                        icon: SiqiGlyph.workspace,
-                        trailing: settings.activeWorkspacePath == null
-                            ? SiqiStatusPill(
-                                label: context.l10n.notConfigured,
-                                glyph: SiqiGlyph.warning,
-                                compact: true,
-                                color: Theme.of(context).colorScheme.error,
-                              )
-                            : SiqiStatusPill(
-                                label: context.l10n.localReady,
-                                glyph: SiqiGlyph.check,
-                                compact: true,
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const SiqiIconBadge(glyph: SiqiGlyph.harness),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  context.l10n.deepSeekHarnessTitle,
+                                  style: Theme.of(context).textTheme.titleLarge
+                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(context.l10n.harnessDescription),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          FilledButton.tonal(
+                            onPressed: () => Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => const HarnessPage(),
                               ),
+                            ),
+                            child: Text(context.l10n.harnessDashboard),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 12),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth >= 760
-                              ? (constraints.maxWidth - 30) / 4
-                              : (constraints.maxWidth - 10) / 2;
-                          return Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: [
-                              SizedBox(
-                                width: width,
-                                child: SiqiMetricCard(
-                                  label: context.l10n.conversations,
-                                  value: '${chat.sessions.length}',
-                                  glyph: SiqiGlyph.chat,
-                                ),
-                              ),
-                              SizedBox(
-                                width: width,
-                                child: SiqiMetricCard(
-                                  label: context.l10n.apiProfiles,
-                                  value: '${chat.profiles.length}',
-                                  caption: context.l10n.tokensUsed(totalTokens),
-                                  glyph: SiqiGlyph.key,
-                                ),
-                              ),
-                              SizedBox(
-                                width: width,
-                                child: SiqiMetricCard(
-                                  label: context.l10n.mcpServersMetric,
-                                  value: servers.when(
-                                    data: (value) => '${value.length}',
-                                    loading: () => '…',
-                                    error: (_, __) => '—',
-                                  ),
-                                  glyph: SiqiGlyph.mcp,
-                                ),
-                              ),
-                              SizedBox(
-                                width: width,
-                                child: SiqiMetricCard(
-                                  label: context.l10n.localModelsMetric,
-                                  value: '$localModels',
-                                  caption: context.l10n.availableToDownload,
-                                  glyph: SiqiGlyph.chip,
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      SiqiSectionHeader(
-                        title: context.l10n.workbenchTools,
-                        subtitle: context.l10n.workbenchToolsDescription,
-                        icon: SiqiGlyph.tools,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),

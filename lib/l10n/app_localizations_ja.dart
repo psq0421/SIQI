@@ -1220,7 +1220,56 @@ class AppLocalizationsJa extends AppLocalizations {
   String get downloadOfficialRuntime => '公式ランタイムをダウンロード';
 
   @override
-  String get harnessPluginCatalog => 'Harness プラグインカタログ';
+  String get harnessPluginCatalog => 'Harness プラグイン管理';
+
+  @override
+  String get harnessPluginManagement => 'Harness プラグイン管理';
+
+  @override
+  String get harnessImportLocalPlugin => 'ローカルプラグインをインポート';
+
+  @override
+  String get harnessBrowseGithubPlugins => 'GitHub のプラグインを探す';
+
+  @override
+  String get harnessBrowseChinesePlugins => '中国語プラグインサイトを開く';
+
+  @override
+  String get harnessLocalPlugins => 'ローカルプラグイン';
+
+  @override
+  String get harnessNoLocalPlugins => 'ローカルプラグインはありません';
+
+  @override
+  String get harnessImportHint =>
+      'ZIP、TGZ、TAR.GZ、DSH、JSON のプラグインアーカイブをインポートするか、外部サイトで探してください。';
+
+  @override
+  String get harnessPluginImported => 'プラグインをローカルにインポートしました';
+
+  @override
+  String harnessPluginImportFailed(String reason) {
+    return 'プラグインのインポートに失敗しました：$reason';
+  }
+
+  @override
+  String get harnessDeleteLocalPlugin => 'ローカルプラグインを削除';
+
+  @override
+  String get harnessExternalPluginWarning =>
+      '外部プラグインは司器が審査していません。利用前に出所、ライセンス、スクリプトを確認してください。';
+
+  @override
+  String get searchLocalPlugins => 'ローカルプラグインを検索';
+
+  @override
+  String get harnessOpenRuntimeFile => 'ローカルランタイムファイルを表示';
+
+  @override
+  String get harnessRuntimeNotDownloaded => '先にランタイムパッケージをダウンロードしてください。';
+
+  @override
+  String get harnessRuntimePath => 'ローカルランタイムファイルのパス';
 
   @override
   String get developmentDocs => '開発ドキュメント';

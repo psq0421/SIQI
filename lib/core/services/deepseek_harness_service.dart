@@ -190,6 +190,77 @@ class DeepSeekHarnessService {
     await _database.clearHarnessPluginArchive(plugin.repositoryId);
   }
 
+  /// Imports a plugin archive selected by the user.  No online catalog is
+  /// consulted and the archive is never executed by the application.
+  Future<HarnessPlugin> importLocalPlugin(String sourcePath) async {
+    final source = File(sourcePath);
+    if (!await source.exists()) {
+      throw const FileSystemException('Plugin archive does not exist.');
+    }
+    final extension = p.extension(source.path).toLowerCase();
+    final lowerName = p.basename(source.path).toLowerCase();
+    final supported =
+        extension == '.zip' ||
+        extension == '.tgz' ||
+        extension == '.dsh' ||
+        lowerName.endsWith('.tar.gz') ||
+        extension == '.json';
+    if (!supported) {
+      throw const FormatException(
+        'Supported plugin files: ZIP, TGZ, TAR.GZ, DSH, or JSON.',
+      );
+    }
+    final digest = await sha256.bind(source.openRead()).first;
+    final shortHash = digest.toString().substring(0, 16);
+    final directory = await localPluginDirectory();
+    final safeName = p
+        .basename(source.path)
+        .replaceAll(RegExp(r'[^A-Za-z0-9._-]+'), '_');
+    final target = File(p.join(directory.path, '$shortHash-$safeName'));
+    if (p.normalize(source.path) != p.normalize(target.path)) {
+      await source.copy(target.path);
+    }
+    final plugin = HarnessPlugin(
+      repositoryId: 'local/$shortHash/$safeName',
+      name: safeName,
+      owner: '本地导入',
+      description: '由用户从本地导入的 Harness 插件归档。',
+      category: '本地',
+      kind: extension.replaceFirst('.', '').toUpperCase(),
+      repositoryUrl: '',
+      detailUrl: '',
+      stars: '',
+      updatedLabel: DateTime.now().toIso8601String(),
+      syncedAt: DateTime.now(),
+      archivePath: target.path,
+      license: 'Local import',
+    );
+    await _database.upsertHarnessPlugins([plugin]);
+    await _database.saveHarnessPluginArchive(
+      plugin.repositoryId,
+      archivePath: target.path,
+      commitSha: '',
+      license: 'Local import',
+    );
+    return plugin;
+  }
+
+  Future<Directory> localPluginDirectory() async {
+    final support = await getApplicationSupportDirectory();
+    final directory = Directory(p.join(support.path, 'harness', 'plugins'));
+    await directory.create(recursive: true);
+    return directory;
+  }
+
+  Future<void> deleteLocalPlugin(HarnessPlugin plugin) async {
+    final path = plugin.archivePath;
+    if (path != null) {
+      final file = File(path);
+      if (await file.exists()) await file.delete();
+    }
+    await _database.deleteHarnessPlugin(plugin.repositoryId);
+  }
+
   String installCommand(HarnessPlugin plugin) {
     final revision = plugin.commitSha;
     if (revision == null || revision.isEmpty) return '';

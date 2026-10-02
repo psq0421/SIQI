@@ -1195,7 +1195,55 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadOfficialRuntime => '下载官方运行包';
 
   @override
-  String get harnessPluginCatalog => 'Harness 插件目录';
+  String get harnessPluginCatalog => 'Harness 插件管理';
+
+  @override
+  String get harnessPluginManagement => 'Harness 插件管理';
+
+  @override
+  String get harnessImportLocalPlugin => '导入本地插件';
+
+  @override
+  String get harnessBrowseGithubPlugins => '浏览 GitHub 插件';
+
+  @override
+  String get harnessBrowseChinesePlugins => '浏览中文插件站';
+
+  @override
+  String get harnessLocalPlugins => '本地插件';
+
+  @override
+  String get harnessNoLocalPlugins => '暂无本地插件';
+
+  @override
+  String get harnessImportHint =>
+      '可导入 ZIP、TGZ、TAR.GZ、DSH 或 JSON 插件归档，也可以前往外部站点自行查找。';
+
+  @override
+  String get harnessPluginImported => '插件已导入本地';
+
+  @override
+  String harnessPluginImportFailed(String reason) {
+    return '插件导入失败：$reason';
+  }
+
+  @override
+  String get harnessDeleteLocalPlugin => '删除本地插件';
+
+  @override
+  String get harnessExternalPluginWarning => '外部插件未经司器审核，请在运行前自行检查来源、许可证和脚本内容。';
+
+  @override
+  String get searchLocalPlugins => '搜索本地插件';
+
+  @override
+  String get harnessOpenRuntimeFile => '查看本地运行时文件';
+
+  @override
+  String get harnessRuntimeNotDownloaded => '请先下载运行时安装包。';
+
+  @override
+  String get harnessRuntimePath => '本地运行时文件路径';
 
   @override
   String get developmentDocs => '开发文档';
@@ -2937,7 +2985,55 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get downloadOfficialRuntime => '下載官方執行套件';
 
   @override
-  String get harnessPluginCatalog => 'Harness 外掛目錄';
+  String get harnessPluginCatalog => 'Harness 外掛管理';
+
+  @override
+  String get harnessPluginManagement => 'Harness 外掛管理';
+
+  @override
+  String get harnessImportLocalPlugin => '匯入本機外掛';
+
+  @override
+  String get harnessBrowseGithubPlugins => '瀏覽 GitHub 外掛';
+
+  @override
+  String get harnessBrowseChinesePlugins => '瀏覽中文外掛站';
+
+  @override
+  String get harnessLocalPlugins => '本機外掛';
+
+  @override
+  String get harnessNoLocalPlugins => '目前沒有本機外掛';
+
+  @override
+  String get harnessImportHint =>
+      '可匯入 ZIP、TGZ、TAR.GZ、DSH 或 JSON 外掛封存，也可前往外部網站自行尋找。';
+
+  @override
+  String get harnessPluginImported => '外掛已匯入本機';
+
+  @override
+  String harnessPluginImportFailed(String reason) {
+    return '外掛匯入失敗：$reason';
+  }
+
+  @override
+  String get harnessDeleteLocalPlugin => '刪除本機外掛';
+
+  @override
+  String get harnessExternalPluginWarning => '外部外掛未經司器審核，使用前請自行檢查來源、授權與腳本內容。';
+
+  @override
+  String get searchLocalPlugins => '搜尋本機外掛';
+
+  @override
+  String get harnessOpenRuntimeFile => '檢視本機執行環境檔案';
+
+  @override
+  String get harnessRuntimeNotDownloaded => '請先下載執行環境套件。';
+
+  @override
+  String get harnessRuntimePath => '本機執行環境檔案路徑';
 
   @override
   String get developmentDocs => '開發文件';

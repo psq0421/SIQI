@@ -1261,7 +1261,57 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadOfficialRuntime => 'Download official runtime';
 
   @override
-  String get harnessPluginCatalog => 'Harness plugin catalog';
+  String get harnessPluginCatalog => 'Harness plugin management';
+
+  @override
+  String get harnessPluginManagement => 'Harness plugin management';
+
+  @override
+  String get harnessImportLocalPlugin => 'Import local plugin';
+
+  @override
+  String get harnessBrowseGithubPlugins => 'Browse GitHub plugins';
+
+  @override
+  String get harnessBrowseChinesePlugins => 'Browse Chinese plugin site';
+
+  @override
+  String get harnessLocalPlugins => 'Local plugins';
+
+  @override
+  String get harnessNoLocalPlugins => 'No local plugins';
+
+  @override
+  String get harnessImportHint =>
+      'Import a ZIP, TGZ, TAR.GZ, DSH, or JSON plugin archive, or browse an external site to find one.';
+
+  @override
+  String get harnessPluginImported => 'Plugin imported locally';
+
+  @override
+  String harnessPluginImportFailed(String reason) {
+    return 'Plugin import failed: $reason';
+  }
+
+  @override
+  String get harnessDeleteLocalPlugin => 'Delete local plugin';
+
+  @override
+  String get harnessExternalPluginWarning =>
+      'External plugins are not reviewed by SIQI. Inspect their source and license before using them in a runtime.';
+
+  @override
+  String get searchLocalPlugins => 'Search local plugins';
+
+  @override
+  String get harnessOpenRuntimeFile => 'View local runtime file';
+
+  @override
+  String get harnessRuntimeNotDownloaded =>
+      'Download the runtime package first.';
+
+  @override
+  String get harnessRuntimePath => 'Local runtime file path';
 
   @override
   String get developmentDocs => 'Development docs';

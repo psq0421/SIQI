@@ -42,6 +42,14 @@ class MainActivity : FlutterActivity() {
                 }
                 "runtimeInfo" -> result.success(runtimeInfo())
                 "captureWithSystemCamera" -> captureWithSystemCamera(result)
+                "openFile" -> {
+                    val path = call.argument<String>("path")
+                    if (path == null) {
+                        result.success(false)
+                    } else {
+                        result.success(openFile(path))
+                    }
+                }
                 "normalizeImage" -> {
                     val source = call.argument<String>("source")
                     val target = call.argument<String>("target")
@@ -154,6 +162,37 @@ class MainActivity : FlutterActivity() {
         } catch (_: Exception) { 0L to 0L }
     }
 
+    private fun openFile(path: String): Boolean {
+        return try {
+            val file = File(path)
+            if (!file.exists() || !file.isFile) return false
+            val uri = FileProvider.getUriForFile(
+                this,
+                "${applicationContext.packageName}.fileprovider",
+                file
+            )
+            val extension = file.extension.lowercase()
+            val mime = when (extension) {
+                "zip" -> "application/zip"
+                "tgz", "gz" -> "application/gzip"
+                "json" -> "application/json"
+                else -> "application/octet-stream"
+            }
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setDataAndType(uri, mime)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            if (intent.resolveActivity(packageManager) == null) return false
+            startActivity(intent)
+            true
+        } catch (_: ActivityNotFoundException) {
+            false
+        } catch (_: Exception) {
+            false
+        }
+    }
+
     private fun captureWithSystemCamera(result: MethodChannel.Result) {
         if (pendingCameraResult != null) {
             result.error("camera-busy", "A camera capture is already running", null)
@@ -172,6 +211,14 @@ class MainActivity : FlutterActivity() {
         try {
             startActivityForResult(intent, CAMERA_REQUEST_CODE)
         } catch (_: ActivityNotFoundException) {
+            intent.setPackage(null)
+            try { startActivityForResult(intent, CAMERA_REQUEST_CODE) }
+            catch (error: Exception) {
+                pendingCameraResult = null
+                pendingCameraPath = null
+                result.error("camera-unavailable", error.message, null)
+            }
+        } catch (_: SecurityException) {
             intent.setPackage(null)
             try { startActivityForResult(intent, CAMERA_REQUEST_CODE) }
             catch (error: Exception) {

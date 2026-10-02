@@ -70,8 +70,8 @@ class SettingsPage extends StatelessWidget {
             page: const AboutPage(),
           ),
           (
-            title: 'LAN gateway',
-            subtitle: 'Encrypted local-network control panel on port 1158',
+            title: '局域网网关',
+            subtitle: '端口 1158 的加密局域网控制台',
             glyph: SiqiGlyph.globe,
             page: const LanGatewayPage(),
           ),
