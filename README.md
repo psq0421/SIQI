@@ -1,3 +1,4 @@
+<img width="1024" height="1024" alt="8efac9b20e5f077607c5847706c7af33" src="https://github.com/user-attachments/assets/de72feea-5ec1-4111-950f-9c52c17f8bb5" />
 # 司器（SIQI）
 English：[README_EN.md](https://github.com/psq0421/SIQI/edit/master/README_EN.md)
 
