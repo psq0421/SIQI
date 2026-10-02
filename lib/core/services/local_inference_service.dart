@@ -493,6 +493,10 @@ class LocalInferenceService {
         supportedAbis: (runtimeMap['supportedAbis'] as List? ?? const [])
             .map((item) => item.toString())
             .toList(),
+        zramTotalBytes: runtimeMap['zramTotalBytes'] as int? ?? 0,
+        zramUsedBytes: runtimeMap['zramUsedBytes'] as int? ?? 0,
+        swapTotalBytes: runtimeMap['swapTotalBytes'] as int? ?? 0,
+        swapFreeBytes: runtimeMap['swapFreeBytes'] as int? ?? 0,
       ),
       requestedContext: requestedContext,
       requestedOutput: requestedOutput,
@@ -551,6 +555,22 @@ class LocalInferenceService {
   Future<void> cancel() async {
     _cancellationRequested = true;
     _engine?.cancelGeneration();
+  }
+
+  /// Stops generation and releases the native model allocation. This is
+  /// intentionally explicit so users can reclaim memory after a long task.
+  Future<void> unloadModel() async {
+    _cancellationRequested = true;
+    _engine?.cancelGeneration();
+    while (_loading != null) {
+      await _loading;
+    }
+    await _releaseEngine();
+  }
+
+  Future<void> restart() async {
+    await unloadModel();
+    _cancellationRequested = false;
   }
 
   Future<void> _releaseEngine() async {

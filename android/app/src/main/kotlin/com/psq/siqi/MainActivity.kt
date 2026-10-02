@@ -2,6 +2,8 @@ package com.psq.siqi
 
 import android.app.ActivityManager
 import android.content.Context
+import android.content.Intent
+import android.content.ActivityNotFoundException
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder
 import android.media.AudioFormat
@@ -17,11 +19,14 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
+    private var pendingCameraResult: MethodChannel.Result? = null
+    private var pendingCameraPath: String? = null
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
@@ -36,6 +41,7 @@ class MainActivity : FlutterActivity() {
                     result.success(storageStatus(path))
                 }
                 "runtimeInfo" -> result.success(runtimeInfo())
+                "captureWithSystemCamera" -> captureWithSystemCamera(result)
                 "normalizeImage" -> {
                     val source = call.argument<String>("source")
                     val target = call.argument<String>("target")
@@ -113,12 +119,79 @@ class MainActivity : FlutterActivity() {
 
     private fun runtimeInfo(): Map<String, Any> {
         val manager = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+        val swaps = readSwaps()
+        val zramTotal = readLongFile("/sys/block/zram0/disksize")
+        val zramUsed = readLongFile("/sys/block/zram0/mem_used_total")
         return mapOf(
             "sdkInt" to Build.VERSION.SDK_INT,
             "processorCount" to Runtime.getRuntime().availableProcessors(),
             "isLowRamDevice" to manager.isLowRamDevice,
-            "supportedAbis" to Build.SUPPORTED_ABIS.toList()
+            "supportedAbis" to Build.SUPPORTED_ABIS.toList(),
+            "zramTotalBytes" to zramTotal,
+            "zramUsedBytes" to zramUsed,
+            "swapTotalBytes" to swaps.first,
+            "swapFreeBytes" to swaps.second
         )
+    }
+
+    private fun readLongFile(path: String): Long {
+        return try { File(path).readText().trim().toLongOrNull() ?: 0L } catch (_: Exception) { 0L }
+    }
+
+    private fun readSwaps(): Pair<Long, Long> {
+        return try {
+            val lines = File("/proc/swaps").readLines().drop(1)
+            var total = 0L
+            var used = 0L
+            for (line in lines) {
+                val columns = line.trim().split(Regex("\\s+"))
+                if (columns.size >= 4) {
+                    total += columns[2].toLongOrNull() ?: 0L
+                    used += columns[3].toLongOrNull() ?: 0L
+                }
+            }
+            total to (total - used).coerceAtLeast(0L)
+        } catch (_: Exception) { 0L to 0L }
+    }
+
+    private fun captureWithSystemCamera(result: MethodChannel.Result) {
+        if (pendingCameraResult != null) {
+            result.error("camera-busy", "A camera capture is already running", null)
+            return
+        }
+        val directory = File(cacheDir, "camera").apply { mkdirs() }
+        val target = File(directory, "capture-${System.currentTimeMillis()}.jpg")
+        val uri = FileProvider.getUriForFile(this, "$packageName.fileprovider", target)
+        val intent = Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE).apply {
+            putExtra(android.provider.MediaStore.EXTRA_OUTPUT, uri)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            setPackage("com.android.camera")
+        }
+        pendingCameraResult = result
+        pendingCameraPath = target.absolutePath
+        try {
+            startActivityForResult(intent, CAMERA_REQUEST_CODE)
+        } catch (_: ActivityNotFoundException) {
+            intent.setPackage(null)
+            try { startActivityForResult(intent, CAMERA_REQUEST_CODE) }
+            catch (error: Exception) {
+                pendingCameraResult = null
+                pendingCameraPath = null
+                result.error("camera-unavailable", error.message, null)
+            }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != CAMERA_REQUEST_CODE) return
+        val callback = pendingCameraResult
+        val path = pendingCameraPath
+        pendingCameraResult = null
+        pendingCameraPath = null
+        if (callback == null) return
+        if (resultCode == RESULT_OK && path != null && File(path).exists()) callback.success(path)
+        else callback.success(null)
     }
 
     private fun normalizeImage(sourcePath: String, targetPath: String, maxEdge: Int): String {
@@ -322,5 +395,6 @@ class MainActivity : FlutterActivity() {
 
     companion object {
         private const val PLATFORM_CHANNEL = "com.psq.siqi/platform"
+        private const val CAMERA_REQUEST_CODE = 1158
     }
 }

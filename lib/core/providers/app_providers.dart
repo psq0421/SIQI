@@ -33,6 +33,8 @@ import '../services/secure_key_service.dart';
 import '../services/shell_service.dart';
 import '../services/tts_service.dart';
 import '../services/workspace_service.dart';
+import '../services/runtime_spill_service.dart';
+import '../services/local_gateway_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError(),
@@ -79,6 +81,10 @@ final permissionServiceProvider = Provider(
   (ref) => PermissionService(ref.watch(localDatabaseProvider)),
 );
 final cacheServiceProvider = Provider((ref) => const CacheService());
+final runtimeSpillServiceProvider = Provider((ref) => RuntimeSpillService());
+final localGatewayServiceProvider = Provider(
+  (ref) => LocalGatewayService(ref.watch(secureKeyServiceProvider).storage),
+);
 final fileContentServiceProvider = Provider((ref) => FileContentService());
 final ttsServiceProvider = Provider((ref) {
   final service = TtsService(
@@ -204,4 +210,7 @@ final workLogsProvider = FutureProvider(
 );
 final cacheSizeProvider = FutureProvider<int>(
   (ref) => ref.watch(cacheServiceProvider).size(),
+);
+final runtimeSpillSizeProvider = FutureProvider<int>(
+  (ref) => ref.watch(runtimeSpillServiceProvider).size(),
 );

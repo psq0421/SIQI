@@ -180,6 +180,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
           onAttach: () => _attach(modelInfo.multimodal),
           onVoice: _toggleVoiceInput,
           onOcr: _recognizeScreenshot,
+          onCamera: _captureCamera,
           onRemove: ref.read(chatProvider.notifier).removeAttachment,
           onSend: _send,
           onStop: ref.read(chatProvider.notifier).cancel,
@@ -305,6 +306,40 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     }
   }
 
+  Future<void> _captureCamera() async {
+    final decision = await ref
+        .read(permissionServiceProvider)
+        .request(AppPermissionKind.camera, PermissionPurpose.cameraAttachment);
+    if (decision != PermissionDecision.granted) {
+      _showLocalTaskError(const LocalTaskException('camera-denied'));
+      return;
+    }
+    setState(() => _recognizingImage = true);
+    try {
+      final path = await ref
+          .read(platformServiceProvider)
+          .captureWithSystemCamera();
+      await ref
+          .read(permissionServiceProvider)
+          .recordSystemPicker(
+            kind: AppPermissionKind.camera,
+            purpose: PermissionPurpose.cameraAttachment,
+            granted: path != null,
+            detail: path,
+          );
+      if (path == null || !mounted) return;
+      final result = await ref
+          .read(ocrServiceProvider)
+          .recognize(imagePath: path, settings: ref.read(settingsProvider));
+      if (!mounted) return;
+      _insertComposerText(result.text);
+    } on Object catch (error) {
+      _showLocalTaskError(error);
+    } finally {
+      if (mounted) setState(() => _recognizingImage = false);
+    }
+  }
+
   Future<void> _readAloud(String text) async {
     if (_speaking) {
       await ref.read(ttsServiceProvider).stop();
@@ -364,6 +399,7 @@ class _ChatPageState extends ConsumerState<ChatPage> {
       'tts-model-not-installed' => context.l10n.ttsModelRequired,
       'vision-model-not-installed' => context.l10n.ocrModelRequired,
       'microphone-denied' => context.l10n.microphonePermissionDenied,
+      'camera-denied' => context.l10n.permissionDenied,
       'audio-too-long' => context.l10n.audioMaximumDuration,
       'insufficient-memory' => context.l10n.errorMemory,
       'text-too-long' => context.l10n.ttsTextTooLong,

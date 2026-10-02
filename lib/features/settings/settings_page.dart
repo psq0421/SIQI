@@ -12,6 +12,7 @@ import 'data_storage_settings_page.dart';
 import 'diagnostics_page.dart';
 import 'permission_privacy_page.dart';
 import 'shell_settings_page.dart';
+import 'lan_gateway_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -67,6 +68,12 @@ class SettingsPage extends StatelessWidget {
             subtitle: context.l10n.aboutDescription,
             glyph: SiqiGlyph.info,
             page: const AboutPage(),
+          ),
+          (
+            title: 'LAN gateway',
+            subtitle: 'Encrypted local-network control panel on port 1158',
+            glyph: SiqiGlyph.globe,
+            page: const LanGatewayPage(),
           ),
         ];
     return Column(

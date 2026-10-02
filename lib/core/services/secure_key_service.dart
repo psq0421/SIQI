@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 class SecureKeyService {
   const SecureKeyService(this._storage);
   final FlutterSecureStorage _storage;
+  FlutterSecureStorage get storage => _storage;
   static const _prefix = 'api_key_';
   static const _githubKey = 'github_access_token';
 

@@ -565,4 +565,9 @@
   "reasoningMedium": "Medium",
   "reasoningHigh": "High"
   ,"modelFilesDetected": "Model files detected"
+  ,"lanGateway": "LAN gateway",
+  "lanGatewayDescription": "Optional encrypted local-network control panel on port 1158. It is disabled by default.",
+  "lanGatewayEnable": "Enable LAN gateway",
+  "lanGatewayDisabled": "Disabled",
+  "lanGatewayRotateToken": "Rotate device token"
 }

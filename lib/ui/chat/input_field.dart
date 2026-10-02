@@ -17,6 +17,7 @@ class ChatInputField extends StatelessWidget {
     required this.onAttach,
     required this.onVoice,
     required this.onOcr,
+    required this.onCamera,
     required this.onRemove,
     required this.onSend,
     required this.onStop,
@@ -34,6 +35,7 @@ class ChatInputField extends StatelessWidget {
   final VoidCallback onAttach;
   final VoidCallback onVoice;
   final VoidCallback onOcr;
+  final VoidCallback onCamera;
   final ValueChanged<AppAttachment> onRemove;
   final VoidCallback onSend;
   final VoidCallback onStop;
@@ -98,6 +100,11 @@ class ChatInputField extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const SiqiIcon(SiqiGlyph.image),
+              ),
+              IconButton(
+                tooltip: context.l10n.screenshotOcr,
+                onPressed: sending || recognizingImage ? null : onCamera,
+                icon: const Icon(Icons.camera_alt_rounded),
               ),
               Expanded(
                 child: TextField(

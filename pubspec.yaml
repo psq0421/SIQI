@@ -1,7 +1,7 @@
 name: siqi
 description: A local-first AI workstation for Android.
 publish_to: none
-version: 1.0.0-beta.1+4006
+version: 1.0.0-beta.2+4100
 
 environment:
   sdk: '>=3.10.7 <4.0.0'

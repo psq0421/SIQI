@@ -6,7 +6,7 @@
     android:viewportHeight="108">
     <path
         android:fillColor="@android:color/transparent"
-        android:pathData="M34,27 C28,27 25,30 25,36 L25,72 C25,78 28,81 34,81 L74,81 C80,81 83,78 83,72 L83,36 C83,30 80,27 74,27 Z M39,43 L69,43 M39,55 L59,55 M51,69 L69,55 L69,69"
+        android:pathData="M54,19 C76,19 91,35 91,54 C91,75 75,90 54,90 C35,90 20,76 20,57 C20,39 33,25 50,22 M50,22 C59,19 70,23 75,31 C80,40 77,50 68,54 C59,58 49,53 47,44 C45,35 51,28 60,27 C69,26 78,33 81,42 M58,82 C42,82 31,73 31,60 C31,49 39,41 49,40 C59,39 67,47 66,56 C65,65 56,70 48,68 C40,66 36,58 39,51"
         android:strokeColor="#FF000000"
         android:strokeLineCap="round"
         android:strokeLineJoin="round"

@@ -32,12 +32,23 @@ class DeviceRuntimeInfo {
     required this.processorCount,
     required this.isLowRamDevice,
     required this.supportedAbis,
+    this.zramTotalBytes = 0,
+    this.zramUsedBytes = 0,
+    this.swapTotalBytes = 0,
+    this.swapFreeBytes = 0,
   });
 
   final int sdkInt;
   final int processorCount;
   final bool isLowRamDevice;
   final List<String> supportedAbis;
+
+  /// Read-only kernel swap metrics. Android apps cannot reconfigure ZRAM
+  /// without privileged access, so SIQI only reports its current state.
+  final int zramTotalBytes;
+  final int zramUsedBytes;
+  final int swapTotalBytes;
+  final int swapFreeBytes;
 }
 
 class PlatformService {
@@ -89,6 +100,15 @@ class PlatformService {
       supportedAbis: (result['supportedAbis'] as List? ?? const [])
           .map((item) => item.toString())
           .toList(),
+      zramTotalBytes: result['zramTotalBytes'] as int? ?? 0,
+      zramUsedBytes: result['zramUsedBytes'] as int? ?? 0,
+      swapTotalBytes: result['swapTotalBytes'] as int? ?? 0,
+      swapFreeBytes: result['swapFreeBytes'] as int? ?? 0,
     );
+  }
+
+  Future<String?> captureWithSystemCamera() async {
+    final path = await _channel.invokeMethod<String>('captureWithSystemCamera');
+    return path;
   }
 }

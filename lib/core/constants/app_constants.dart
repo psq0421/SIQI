@@ -457,6 +457,25 @@ abstract final class ModelCatalog {
         ),
       ],
     ),
+    // Large-model targets are intentionally metadata-only until an official
+    // mainland mirror publishes a verifiable GGUF manifest. The market must
+    // never present an unverified URL as a download button.
+    ModelDefinition.compatibilityTarget(
+      id: 'target-gpt-oss-20b-moe',
+      displayName: 'GPT-OSS-20B MoE（量化目标）',
+      provider: 'Open model ecosystem',
+      license: 'Check official model card',
+      task: ModelTask.chat,
+      sourceUrl: 'https://huggingface.co/models?search=gpt-oss-20b',
+    ),
+    ModelDefinition.compatibilityTarget(
+      id: 'target-qwen-dense-7-9b',
+      displayName: 'Qwen Dense 7–9B（量化目标）',
+      provider: 'Qwen',
+      license: 'Apache-2.0（以模型卡为准）',
+      task: ModelTask.chat,
+      sourceUrl: 'https://modelscope.cn/models?name=Qwen%207B%209B%20GGUF',
+    ),
     ModelDefinition.compatibilityTarget(
       id: 'target-openpangu-20-7b',
       displayName: 'openPangu 2.0 7B',

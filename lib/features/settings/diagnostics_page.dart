@@ -53,6 +53,7 @@ class DiagnosticsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final cache = ref.watch(cacheSizeProvider);
     final workLogs = ref.watch(workLogsProvider);
+    final spill = ref.watch(runtimeSpillSizeProvider);
     return Scaffold(
       appBar: AppBar(title: Text(context.l10n.logsAndCache)),
       body: ListView(
@@ -61,6 +62,23 @@ class DiagnosticsPage extends ConsumerWidget {
           Card(
             child: Column(
               children: [
+                ListTile(
+                  leading: const Icon(Icons.stop_circle_outlined),
+                  title: const Text('Release active model'),
+                  subtitle: const Text('Stop generation and release native model memory.'),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await ref.read(localInferenceServiceProvider).unloadModel();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Model memory released')),
+                        );
+                      }
+                    },
+                    child: const Text('Release'),
+                  ),
+                ),
+                const Divider(height: 1),
                 ListTile(
                   leading: const SiqiIcon(SiqiGlyph.storage),
                   title: Text(context.l10n.cache),
@@ -77,6 +95,25 @@ class DiagnosticsPage extends ConsumerWidget {
                       ref.invalidate(cacheSizeProvider);
                     },
                     child: Text(context.l10n.clearCache),
+                  ),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: const Icon(Icons.memory_rounded),
+                  title: const Text('Runtime spill cache'),
+                  subtitle: Text(
+                    spill.when(
+                      data: _formatBytes,
+                      loading: () => context.l10n.calculating,
+                      error: (_, __) => context.l10n.unavailable,
+                    ),
+                  ),
+                  trailing: TextButton(
+                    onPressed: () async {
+                      await ref.read(runtimeSpillServiceProvider).clear();
+                      ref.invalidate(runtimeSpillSizeProvider);
+                    },
+                    child: const Text('Clear'),
                   ),
                 ),
                 const Divider(height: 1),

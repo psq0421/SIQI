@@ -298,20 +298,18 @@ class _SiqiIconPainter extends CustomPainter {
       c.drawRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)), p);
 
   void _brand(Canvas c, Paint p) {
-    _roundRect(c, p, const Rect.fromLTWH(4, 4, 16, 16), 4.5);
-    _lines(c, p, const [
-      Offset(8, 8.2),
-      Offset(16, 8.2),
-      Offset(8, 12),
-      Offset(13.5, 12),
-    ]);
-    c.drawPath(
-      Path()
-        ..moveTo(11, 16.3)
-        ..lineTo(16.5, 12)
-        ..lineTo(16.5, 16.3),
-      p,
-    );
+    // Rounded abstract spiral: a compact, non-square mark that remains
+    // recognizable at launcher and toolbar sizes.
+    final path = Path()
+      ..moveTo(12, 3.5)
+      ..cubicTo(18.2, 3.5, 21, 7.3, 20.2, 11.8)
+      ..cubicTo(19.4, 16.2, 15.7, 19.2, 11.8, 18.3)
+      ..cubicTo(7.7, 17.4, 5.5, 13.4, 7.2, 10.2)
+      ..cubicTo(8.8, 7.2, 12.7, 6.2, 15.1, 8.5)
+      ..cubicTo(17.4, 10.8, 16.3, 14.2, 13.7, 14.8)
+      ..cubicTo(11.2, 15.4, 9.5, 13.3, 10.2, 11.5)
+      ..cubicTo(10.8, 9.8, 13, 9.5, 14, 10.8);
+    c.drawPath(path, p);
   }
 
   void _chat(Canvas c, Paint p) {
