@@ -19,7 +19,7 @@ Flutter：stable 3.47.0 或更高兼容版本
 
 ![司器本地优先架构](docs/images/siqi-architecture.svg)
 
-![司器工作流：从提示到本地结果](docs/images/siqi-workflows.svg)
+![司器四层工作机制：交互、编排、执行、数据安全](docs/images/siqi-workflows.svg)
 
 上面的配图概括了司器的两条核心原则：本地推理与本地数据优先；网络只在用户明确配置 API、模型下载、MCP 或 GitHub 导入时使用。
 

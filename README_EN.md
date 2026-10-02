@@ -19,7 +19,7 @@ Source license: MIT License
 
 ![SIQI local-first architecture](docs/images/siqi-architecture.svg)
 
-![SIQI workflow from prompt to local result](docs/images/siqi-workflows.svg)
+![SIQI four-layer work mechanism: interaction, orchestration, execution, and data safety](docs/images/siqi-workflows.svg)
 
 The diagrams summarize SIQI's two core principles: local inference and local data by default; network access is used only when the user explicitly configures an API, model download, MCP source, or GitHub import.
 
