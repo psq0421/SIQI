@@ -19,6 +19,10 @@ android {
     compileSdk = 37
     ndkVersion = "29.0.14206865"
 
+    externalNativeBuild {
+        cmake { path = file("src/main/cpp/CMakeLists.txt") }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

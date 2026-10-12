@@ -25,6 +25,14 @@ class InferenceResourcePlan {
     required this.threadCount,
     required this.estimatedPeakBytes,
     required this.audioDurationSeconds,
+    this.pressureLevel = 'normal',
+    this.backendHint = 'auto',
+    this.gpuLayers = 999,
+    this.batchSize = 256,
+    this.microBatchSize = 128,
+    this.cacheType = 'q8_0',
+    this.flashAttention = true,
+    this.swapAssisted = false,
     this.reasonCode,
   });
 
@@ -34,6 +42,17 @@ class InferenceResourcePlan {
   final int threadCount;
   final int estimatedPeakBytes;
   final int audioDurationSeconds;
+
+  /// A diagnostic label, not a fixed memory quota. It is derived from the
+  /// current kernel pressure and can change between requests.
+  final String pressureLevel;
+  final String backendHint;
+  final int gpuLayers;
+  final int batchSize;
+  final int microBatchSize;
+  final String cacheType;
+  final bool flashAttention;
+  final bool swapAssisted;
   final String? reasonCode;
 }
 
@@ -70,20 +89,44 @@ abstract final class ResourcePlanner {
     required int requestedOutput,
     bool withMultimodalProjector = false,
   }) {
-    // ActivityManager.availMem already includes reclaimable cache; its
-    // `threshold` is a low-memory signal, not memory that every app must
-    // reserve again. Keep an explicit process-safety reserve and independently
-    // cap the inference working set to 85% of physical RAM.
-    final systemReserve = runtime.isLowRamDevice ? 1024 * _mib : 512 * _mib;
-    final availableBudget = math.max(0, memory.availableBytes - systemReserve);
-    final totalBudget = memory.totalBytes > 0
-        ? (memory.totalBytes * .85).round()
-        : availableBudget;
-    final usable = math.min(availableBudget, totalBudget);
+    // Do not impose a percentage of physical RAM. Android's availMem already
+    // accounts for reclaimable pages and the kernel's low-memory threshold is
+    // a pressure signal, not a user-facing quota. A mapped GGUF can be larger
+    // than RAM, so admission is based on the estimated resident working set
+    // plus currently free swap/ZRAM.
+    final lowThreshold = memory.lowMemoryThresholdBytes > 0
+        ? memory.lowMemoryThresholdBytes
+        : (runtime.isLowRamDevice ? 768 : 512) * _mib;
+    final pressure = memory.availableBytes <= lowThreshold
+        ? 'critical'
+        : memory.availableBytes <= lowThreshold * 2
+        ? 'constrained'
+        : runtime.swapFreeBytes > 512 * _mib && memory.availableBytes < 2 * _gib
+        ? 'swap-assisted'
+        : 'normal';
+    final reserve = pressure == 'critical'
+        ? 256 * _mib
+        : pressure == 'constrained'
+        ? 384 * _mib
+        : 512 * _mib;
+    final swapCredit = runtime.swapFreeBytes > 0
+        ? (runtime.swapFreeBytes * (pressure == 'normal' ? .20 : .35)).round()
+        : 0;
+    final usable = math.max(0, memory.availableBytes - reserve) + swapCredit;
     final projectorWorkingSet = withMultimodalProjector
         ? (model.projectorArtifact?.sizeBytes ?? 384 * _mib) + 256 * _mib
         : 0;
-    final baseWorkingSet = modelBytes + projectorWorkingSet + 512 * _mib;
+    // mmap keeps cold model pages file-backed. Use a conservative resident
+    // estimate rather than charging the complete GGUF size to RAM.
+    final largeMapped = modelBytes > math.max(2 * _gib, memory.availableBytes);
+    // This is a bootstrap estimate, NOT a predicted peak RSS. File-backed
+    // pages can grow beyond it during generation; benchmark pressure is
+    // recorded separately. Dense models must not be assumed to have a tiny
+    // MoE active set.
+    final mappedResident = largeMapped
+        ? math.min(modelBytes, 1024 * _mib)
+        : modelBytes;
+    final baseWorkingSet = mappedResident + projectorWorkingSet + 256 * _mib;
     final headroom = usable - baseWorkingSet;
     final kvBytesPerToken = switch (modelBytes) {
       >= 4 * _gib => 96 * 1024,
@@ -100,34 +143,49 @@ abstract final class ResourcePlanner {
       32768,
       65536,
       131072,
-      262144,
     ];
     final contextCap = contextOptions.lastWhere(
       (value) => value <= contextByMemory,
       orElse: () => 2048,
     );
-    final context = requestedContext.clamp(2048, contextCap).toInt();
+    final context = requestedContext
+        .clamp(2048, largeMapped ? math.min(contextCap, 2048) : contextCap)
+        .toInt();
     final output = requestedOutput
-        .clamp(64, math.max(64, context ~/ 2))
+        .clamp(1, math.max(1, context ~/ 2))
         .toInt();
     final kvEstimate = context * kvBytesPerToken;
     final peak = baseWorkingSet + kvEstimate;
     final allowed =
-        usable > 0 && contextByMemory >= contextOptions.first && peak <= usable;
+        pressure != 'critical' &&
+        usable > 0 &&
+        contextByMemory >= contextOptions.first &&
+        peak <= usable + (pressure == 'critical' ? 0 : 128 * _mib);
     final audioBytesPerSecond = 16000 * 2 * 10;
     final audioSeconds = math
         .max(0, headroom ~/ audioBytesPerSecond)
         .clamp(0, 4 * 60 * 60)
         .toInt();
+    // Vulkan often duplicates/offloads weights rather than paging them.
+    // Never try full GPU allocation for a GGUF larger than free physical RAM.
+    final gpu = largeMapped || pressure == 'critical' ? 0 : 999;
+    final batch = pressure == 'normal' ? 512 : 256;
+    final microBatch = pressure == 'normal' ? 256 : 128;
     return InferenceResourcePlan(
       allowed: allowed,
       contextWindow: context,
       maxOutputTokens: output,
-      threadCount: runtime.processorCount
-          .clamp(1, runtime.isLowRamDevice ? 4 : 6)
-          .toInt(),
+      threadCount: runtime.processorCount.clamp(1, 4).toInt(),
       estimatedPeakBytes: peak,
       audioDurationSeconds: audioSeconds,
+      pressureLevel: pressure,
+      backendHint: gpu == 0 ? 'cpu' : 'auto',
+      gpuLayers: gpu,
+      batchSize: batch,
+      microBatchSize: microBatch,
+      cacheType: pressure == 'critical' ? 'q4_0' : 'q8_0',
+      flashAttention: true,
+      swapAssisted: runtime.swapFreeBytes > 0 && mappedResident < modelBytes,
       reasonCode: allowed ? null : 'insufficient-memory',
     );
   }

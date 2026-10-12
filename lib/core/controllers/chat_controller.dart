@@ -463,6 +463,9 @@ class ChatController extends StateNotifier<ChatState> {
           status.detail,
         );
       }
+      await _localInference.configureCpuAffinity(
+        _settings().selectedCpuCores,
+      );
       // A downloaded vision projector is not part of a text-only request's
       // working set. Keeping it out here avoids both needless model-load time
       // and a false low-memory rejection on otherwise capable phones.

@@ -39,18 +39,48 @@ class LocalInferenceCancelledException implements Exception {
   const LocalInferenceCancelledException();
 }
 
+/// Explicit, reproducible benchmark settings; never exposed to LAN callers.
+class LocalInferenceTuning {
+  const LocalInferenceTuning({
+    this.backend = GpuBackend.cpu,
+    this.gpuLayers = 0,
+    this.threads = 4,
+    this.batchSize = 128,
+    this.microBatchSize = 64,
+    this.cacheType = 'q8_0',
+    this.flashAttention = true,
+  });
+  final GpuBackend backend;
+  final int gpuLayers;
+  final int threads;
+  final int batchSize;
+  final int microBatchSize;
+  final String cacheType;
+  final bool flashAttention;
+}
+
 class _LoadAttempt {
   const _LoadAttempt({
     required this.contextSize,
     required this.backend,
     required this.gpuLayers,
     required this.threadCount,
+    required this.batchSize,
+    required this.microBatchSize,
+    required this.cacheType,
+    required this.flashAttention,
+    required this.liteRtLmBackend,
   });
 
   final int contextSize;
   final GpuBackend backend;
   final int gpuLayers;
   final int threadCount;
+  final int batchSize;
+  final int microBatchSize;
+  final String cacheType;
+  final bool flashAttention;
+  final LiteRtLmBackendPreference liteRtLmBackend;
 }
 
 /// Owns one current llama.cpp engine. The native runtime contains explicit
@@ -58,6 +88,14 @@ class _LoadAttempt {
 /// isolate.
 class LocalInferenceService {
   static const _platformChannel = MethodChannel('com.psq.siqi/platform');
+
+  /// Applies the persisted process mask before loading the native engine. The
+  /// native worker inherits this mask when it is spawned, so selected cores
+  /// also govern llama.cpp threads instead of only the UI isolate.
+  Future<void> configureCpuAffinity(List<int> cores) async {
+    if (cores.isEmpty) return;
+    await _platformChannel.invokeMethod<bool>('setCpuAffinity', {'cores': cores});
+  }
   LlamaEngine? _engine;
   String? _loadedModelPath;
   String? _loadedProjectorPath;
@@ -65,6 +103,11 @@ class LocalInferenceService {
   Future<void>? _loading;
   bool _disposed = false;
   bool _cancellationRequested = false;
+  Completer<void>? _requestDone;
+  bool get busy => _requestDone != null;
+  Map<String, Object?>? lastPerformance;
+  bool _fileBackedRepack = false;
+  _LoadAttempt? _effectiveAttempt;
 
   Future<LocalEngineStatus> status() async {
     if (!Platform.isAndroid) {
@@ -102,6 +145,68 @@ class LocalInferenceService {
     required double temperature,
     required double topP,
     required int maxTokens,
+    LocalInferenceTuning? tuning,
+    void Function(String text)? onText,
+  }) async {
+    if (busy) throw StateError('local-inference-busy');
+    final done = Completer<void>();
+    _requestDone = done;
+    lastPerformance = null;
+    var checkingPressure = false;
+    var criticalPressure = false;
+    final watchdog = Timer.periodic(const Duration(seconds: 2), (_) async {
+      if (checkingPressure) return;
+      checkingPressure = true;
+      try {
+        final memory = await _memoryStatus();
+        final available = memory['availableBytes'] as int? ?? 0;
+        final threshold = memory['lowMemoryThresholdBytes'] as int? ?? 0;
+        final stats = await _platformChannel.invokeMapMethod<String, dynamic>(
+          'processStats',
+        );
+        if (identical(_requestDone, done) &&
+            ((threshold > 0 && available < threshold) ||
+                (stats?['thermalStatus'] as int? ?? 0) >= 3)) {
+          criticalPressure = true;
+          await cancel();
+        }
+      } on Object {
+        /* best-effort counters must not break inference */
+      } finally {
+        checkingPressure = false;
+      }
+    });
+    try {
+      return await _completeInternal(
+        model: model,
+        artifactPaths: artifactPaths,
+        messages: messages,
+        systemPrompt: systemPrompt,
+        contextWindow: contextWindow,
+        temperature: temperature,
+        topP: topP,
+        maxTokens: maxTokens,
+        onText: onText,
+        tuning: tuning,
+      );
+    } finally {
+      watchdog.cancel();
+      if (criticalPressure) await _releaseEngine();
+      _requestDone = null;
+      done.complete();
+    }
+  }
+
+  Future<CompletionResult> _completeInternal({
+    required ModelDefinition model,
+    required Map<String, String> artifactPaths,
+    required List<ChatMessage> messages,
+    required String systemPrompt,
+    required int contextWindow,
+    required double temperature,
+    required double topP,
+    required int maxTokens,
+    LocalInferenceTuning? tuning,
     void Function(String text)? onText,
   }) async {
     _cancellationRequested = false;
@@ -153,7 +258,7 @@ class LocalInferenceService {
         : modelBytes >= 2 * 1024 * 1024 * 1024
         ? 512
         : 1024;
-    final requestedOutput = maxTokens.clamp(64, mobileOutputLimit).toInt();
+    final requestedOutput = maxTokens.clamp(1, mobileOutputLimit).toInt();
     final requestedContext = projectorPath == null
         ? contextWindow
         : contextWindow.clamp(2048, 4096).toInt();
@@ -162,11 +267,14 @@ class LocalInferenceService {
             allowed: true,
             contextWindow: loadedContext,
             maxOutputTokens: requestedOutput
-                .clamp(64, loadedContext ~/ 2)
+                .clamp(1, loadedContext ~/ 2)
                 .toInt(),
             threadCount: 1,
             estimatedPeakBytes: modelBytes,
             audioDurationSeconds: 0,
+            backendHint: 'auto',
+            cacheType: 'q8_0',
+            flashAttention: true,
           )
         : isProjectorUpgrade
         ? await _projectorUpgradePlan(
@@ -189,12 +297,22 @@ class LocalInferenceService {
         plan.reasonCode ?? 'insufficient-memory',
       );
     }
+    final requestClock = Stopwatch()..start();
     await _ensureModel(
       modelPath,
       projectorPath,
       plan.contextWindow,
-      plan.threadCount,
+      tuning?.threads ?? plan.threadCount,
+      batchSize: tuning?.batchSize ?? plan.batchSize,
+      microBatchSize: tuning?.microBatchSize ?? plan.microBatchSize,
+      cacheType: tuning?.cacheType ?? plan.cacheType,
+      flashAttention: tuning?.flashAttention ?? plan.flashAttention,
+      gpuLayers: tuning?.gpuLayers ?? plan.gpuLayers,
+      backend:
+          tuning?.backend ??
+          (plan.backendHint == 'cpu' ? GpuBackend.cpu : GpuBackend.auto),
     );
+    final loadWallMs = requestClock.elapsedMilliseconds;
     if (_cancellationRequested) {
       throw const LocalInferenceCancelledException();
     }
@@ -249,6 +367,8 @@ class LocalInferenceService {
       plan.maxOutputTokens,
     );
     final buffer = StringBuffer();
+    final generationClock = Stopwatch()..start();
+    int? firstDeltaMs;
     try {
       await for (final chunk in engine.create(
         fitted.messages,
@@ -261,7 +381,13 @@ class LocalInferenceService {
           penalty: 1.1,
         ),
       )) {
-        final delta = chunk.choices.firstOrNull?.delta.content;
+        final first = chunk.choices.firstOrNull?.delta;
+        if (firstDeltaMs == null &&
+            ((first?.content?.isNotEmpty ?? false) ||
+                (first?.thinking?.isNotEmpty ?? false))) {
+          firstDeltaMs = generationClock.elapsedMilliseconds;
+        }
+        final delta = first?.content;
         if (delta == null || delta.isEmpty) continue;
         buffer.write(delta);
         onText?.call(buffer.toString());
@@ -276,6 +402,38 @@ class LocalInferenceService {
     if (_cancellationRequested) {
       throw const LocalInferenceCancelledException();
     }
+
+    final perf = await engine.getPerformanceContext();
+    lastPerformance = {
+      'runtime': 'llama.cpp-b10333/llamadart-0.8.19',
+      'modelId': model.id,
+      'requestedContext': contextWindow,
+      'effectiveContext': actualContext,
+      'contextWasReduced': actualContext < contextWindow,
+      'effectiveBackend': await engine.getBackendName(),
+      'effectiveGpuLayers': await engine.getResolvedGpuLayers(),
+      'threads': _effectiveAttempt?.threadCount,
+      'batch': _effectiveAttempt?.batchSize,
+      'microBatch': _effectiveAttempt?.microBatchSize,
+      'cacheType': _effectiveAttempt?.cacheType,
+      'flashAttention': _effectiveAttempt?.flashAttention,
+      'coldLoad': !canReuseLoadedAllocation,
+      'context': actualContext,
+      'loadWallMs': loadWallMs,
+      'firstVisibleDeltaMs': firstDeltaMs,
+      'generationWallMs': generationClock.elapsedMilliseconds,
+      'promptEvalTokens': perf?.promptEvalTokens,
+      'promptEvalMs': perf?.promptEvalMs,
+      'evalTokens': perf?.evalTokens,
+      'evalMs': perf?.evalMs,
+      'decodeMs': perf?.decodeMs,
+      'decodeTokensPerSecond': perf != null && perf.evalMs > 0
+          ? perf.evalTokens * 1000 / perf.evalMs
+          : null,
+      'pressure': plan.pressureLevel,
+      'swapAssisted': plan.swapAssisted,
+      'fileBackedRepack': _fileBackedRepack,
+    };
 
     final text = buffer.toString().trim();
     if (text.isEmpty) {
@@ -367,8 +525,14 @@ class LocalInferenceService {
     String modelPath,
     String? projectorPath,
     int contextSize,
-    int threadCount,
-  ) async {
+    int threadCount, {
+    required int batchSize,
+    required int microBatchSize,
+    required String cacheType,
+    required bool flashAttention,
+    required int gpuLayers,
+    required GpuBackend backend,
+  }) async {
     while (_loading != null) {
       await _loading;
     }
@@ -390,6 +554,12 @@ class LocalInferenceService {
       projectorPath,
       contextSize,
       threadCount,
+      batchSize: batchSize,
+      microBatchSize: microBatchSize,
+      cacheType: cacheType,
+      flashAttention: flashAttention,
+      gpuLayers: gpuLayers,
+      backend: backend,
     );
     _loading = loading;
     try {
@@ -403,9 +573,22 @@ class LocalInferenceService {
     String modelPath,
     String? projectorPath,
     int contextSize,
-    int threadCount,
-  ) async {
+    int threadCount, {
+    required int batchSize,
+    required int microBatchSize,
+    required String cacheType,
+    required bool flashAttention,
+    required int gpuLayers,
+    required GpuBackend backend,
+  }) async {
     await _releaseEngine();
+    final bytes = await File(modelPath).length();
+    _fileBackedRepack =
+        await _platformChannel.invokeMethod<bool>('configureInferenceScratch', {
+          'modelBytes': bytes,
+          'enabled': modelPath.toLowerCase().contains('gpt-oss'),
+        }) ??
+        false;
     final contexts = <int>{
       contextSize,
       4096,
@@ -414,9 +597,14 @@ class LocalInferenceService {
     final attempts = <_LoadAttempt>[
       _LoadAttempt(
         contextSize: contexts.first,
-        backend: GpuBackend.auto,
-        gpuLayers: ModelParams.maxGpuLayers,
+        backend: backend,
+        gpuLayers: gpuLayers,
         threadCount: threadCount,
+        batchSize: batchSize,
+        microBatchSize: microBatchSize,
+        cacheType: cacheType,
+        flashAttention: flashAttention,
+        liteRtLmBackend: await _preferredLiteRtLmBackend(modelPath),
       ),
       for (final size in contexts)
         _LoadAttempt(
@@ -424,6 +612,11 @@ class LocalInferenceService {
           backend: GpuBackend.cpu,
           gpuLayers: 0,
           threadCount: threadCount,
+          batchSize: batchSize.clamp(64, 256),
+          microBatchSize: microBatchSize.clamp(32, 128),
+          cacheType: cacheType,
+          flashAttention: flashAttention,
+          liteRtLmBackend: LiteRtLmBackendPreference.auto,
         ),
     ];
     final errors = <String>[];
@@ -439,9 +632,25 @@ class LocalInferenceService {
             preferredBackend: attempt.backend,
             numberOfThreads: attempt.threadCount,
             numberOfThreadsBatch: attempt.threadCount,
-            batchSize: 512,
-            microBatchSize: 256,
+            batchSize: attempt.batchSize,
+            microBatchSize: attempt.microBatchSize,
             useMmap: true,
+            useExtraBufferTypes:
+                _fileBackedRepack || bytes < 2 * 1024 * 1024 * 1024,
+            flashAttention: attempt.flashAttention
+                ? FlashAttention.enabled
+                : FlashAttention.disabled,
+            cacheTypeK: switch (attempt.cacheType) {
+              'q4_0' => KvCacheType.q4_0,
+              'f16' => KvCacheType.f16,
+              _ => KvCacheType.q8_0,
+            },
+            cacheTypeV: switch (attempt.cacheType) {
+              'q4_0' => KvCacheType.q4_0,
+              'f16' => KvCacheType.f16,
+              _ => KvCacheType.q8_0,
+            },
+            liteRtLmBackend: attempt.liteRtLmBackend,
           ),
         );
         if (projectorPath != null) {
@@ -455,6 +664,7 @@ class LocalInferenceService {
         _loadedModelPath = modelPath;
         _loadedProjectorPath = projectorPath;
         _loadedContextSize = attempt.contextSize;
+        _effectiveAttempt = attempt;
         return;
       } on Object catch (error) {
         errors.add('${attempt.backend.name}/${attempt.contextSize}: $error');
@@ -465,6 +675,19 @@ class LocalInferenceService {
       LocalInferenceStage.modelLoad,
       errors.join(' | '),
     );
+  }
+
+  Future<LiteRtLmBackendPreference> _preferredLiteRtLmBackend(
+    String modelPath,
+  ) async {
+    if (!modelPath.toLowerCase().endsWith('.litertlm')) {
+      return LiteRtLmBackendPreference.auto;
+    }
+    final runtime = await _runtimeInfo();
+    final eligible = runtime['npuOptimizationEligible'] as bool? ?? false;
+    return eligible
+        ? LiteRtLmBackendPreference.npu
+        : LiteRtLmBackendPreference.auto;
   }
 
   Future<InferenceResourcePlan> _resourcePlan({
@@ -531,8 +754,13 @@ class LocalInferenceService {
         768 * mib +
         loadedContext * kvBytesPerToken;
     final withinIncrementalHeadroom = available >= incrementalBytes + 512 * mib;
-    final withinTotalCap = total <= 0 || estimatedPeak <= (total * .85).round();
-    final allowed = withinIncrementalHeadroom && withinTotalCap;
+    // No fixed physical-RAM percentage: the platform's available memory and
+    // current swap headroom are the admission signals for an upgrade.
+    final swap = (await _runtimeInfo())['swapFreeBytes'] as int? ?? 0;
+    final dynamicBudget = available + (swap * .25).round();
+    final allowed =
+        withinIncrementalHeadroom &&
+        (total <= 0 || estimatedPeak <= dynamicBudget + modelBytes);
     return InferenceResourcePlan(
       allowed: allowed,
       contextWindow: loadedContext.clamp(2048, 4096).toInt(),
@@ -562,6 +790,7 @@ class LocalInferenceService {
   Future<void> unloadModel() async {
     _cancellationRequested = true;
     _engine?.cancelGeneration();
+    await _requestDone?.future;
     while (_loading != null) {
       await _loading;
     }
@@ -579,12 +808,13 @@ class LocalInferenceService {
     _loadedModelPath = null;
     _loadedProjectorPath = null;
     _loadedContextSize = null;
+    _effectiveAttempt = null;
     if (engine != null) await engine.dispose();
   }
 
   void dispose() {
     _disposed = true;
     _engine?.cancelGeneration();
-    unawaited(_releaseEngine());
+    unawaited(unloadModel());
   }
 }

@@ -1,7 +1,7 @@
 name: siqi
 description: A local-first AI workstation for Android.
 publish_to: none
-version: 1.0.0-beta.2+4100
+version: 1.0.0-beta.3+4200
 
 environment:
   sdk: '>=3.10.7 <4.0.0'
@@ -40,6 +40,11 @@ dependencies:
 
 dev_dependencies:
   flutter_lints: ^5.0.0
+
+dependency_overrides:
+  # Upstream 0.8.19 plus CPU repack control; preserves b10333 native ABI.
+  llamadart:
+    path: third_party/llamadart
 
 flutter:
   uses-material-design: true

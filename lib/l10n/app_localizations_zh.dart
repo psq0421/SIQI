@@ -9,6 +9,85 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get lanGateway => '局域网网关';
+
+  @override
+  String get lanGatewayEnable => '启用局域网网关';
+
+  @override
+  String get lanGatewayRotateToken => '更换设备密令';
+
+  @override
+  String get gatewaySafety =>
+      '密令加密存储，但 HTTP 不加密传输。只在可信 Wi-Fi、ADB 转发或自行配置的 TLS 隧道内使用。';
+
+  @override
+  String get gatewayPort => '监听端口（1024–65535）';
+
+  @override
+  String get gatewayToken => '设备密令（24–256 位，无空格）';
+
+  @override
+  String get gatewaySave => '保存设置';
+
+  @override
+  String get gatewayLoopback => '只监听本机（用于 USB / 加密隧道）';
+
+  @override
+  String get gatewayWifi => '仅允许可信 Wi-Fi 内访问';
+
+  @override
+  String get gatewayModels => '允许查询已安装对话模型';
+
+  @override
+  String get gatewayChat => '允许远程对话（共用本地推理实例）';
+
+  @override
+  String get gatewaySerial => '为避免重复加载模型，仅允许一个推理任务；忙时返回 429。';
+
+  @override
+  String get gatewayTimeout => '请求超时（秒）';
+
+  @override
+  String get gatewayStopFirst => '修改端口或监听范围前，请先关闭网关。';
+
+  @override
+  String get gatewayFailure => '网关操作失败，请检查端口冲突及密令格式。';
+
+  @override
+  String get benchmarkTitle => '性能实验';
+
+  @override
+  String get benchmarkWarning => '实验会加载大模型并消耗电量；保持通风，系统过热时终止。结果不代表已达到 5 t/s。';
+
+  @override
+  String get benchmarkStart => '运行一次基准测试';
+
+  @override
+  String get benchmarkExport => '导出实验记录';
+
+  @override
+  String get benchmarkStop => '停止并释放模型';
+
+  @override
+  String get benchmarkModel => '已安装模型';
+
+  @override
+  String get benchmarkProfile => '后端与线程实验配置';
+
+  @override
+  String get benchmarkNoModel => '未找到可运行的已安装对话模型';
+
+  @override
+  String get benchmarkIdle => '尚未运行；仅保存参数和性能计数，不保存用户对话。';
+
+  @override
+  String get benchmarkRunning => '正在运行受控实验…';
+
+  @override
+  String get benchmarkDescription => '真机基准、内存压力与推理性能记录';
+
+  @override
   String get appName => '司器';
 
   @override
@@ -1791,11 +1870,124 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get modelFilesDetected => '已检测到模型文件';
+
+  @override
+  String get cpuPerformance => 'CPU 与加速器调度';
+
+  @override
+  String get cpuPerformanceDescription => '查看 CPU 核心并为端侧推理设置进程亲和性';
+
+  @override
+  String get cpuCoreSelectionDescription =>
+      '选择的核心会应用到司器进程，并由推理工作线程继承。频率读取自 Android sysfs，可能随温控策略动态变化。';
+
+  @override
+  String get cpuSmallCoreWarning => '不建议只选择 A5xx 能效小核运行大模型，否则吞吐可能明显下降。';
+
+  @override
+  String get cpuCore => 'CPU 核心';
+
+  @override
+  String get cpuApply => '应用核心选择';
+
+  @override
+  String get cpuApplied => '核心亲和性已应用到当前进程';
+
+  @override
+  String get cpuApplyFailed => '系统拒绝了核心亲和性请求';
+
+  @override
+  String get npuStatus => 'Hexagon NPU 状态';
+
+  @override
+  String get npuEligible => '检测到可用 delegate；只有兼容 LiteRT-LM 的模型才会调用';
+
+  @override
+  String get npuUnavailable => '当前设备不可用或尚未验证';
 }
 
 /// The translations for Chinese, as used in Taiwan (`zh_TW`).
 class AppLocalizationsZhTw extends AppLocalizationsZh {
   AppLocalizationsZhTw() : super('zh_TW');
+
+  @override
+  String get lanGateway => '區域網路閘道';
+
+  @override
+  String get lanGatewayEnable => '啟用區域網路閘道';
+
+  @override
+  String get lanGatewayRotateToken => '更換裝置密令';
+
+  @override
+  String get gatewaySafety =>
+      '密令加密存储，但 HTTP 不加密传输。只在可信 Wi-Fi、ADB 转发或自行配置的 TLS 隧道内使用。';
+
+  @override
+  String get gatewayPort => '监听端口（1024–65535）';
+
+  @override
+  String get gatewayToken => '设备密令（24–256 位，无空格）';
+
+  @override
+  String get gatewaySave => '保存设置';
+
+  @override
+  String get gatewayLoopback => '只监听本机（用于 USB / 加密隧道）';
+
+  @override
+  String get gatewayWifi => '仅允许可信 Wi-Fi 内访问';
+
+  @override
+  String get gatewayModels => '允许查询已安装对话模型';
+
+  @override
+  String get gatewayChat => '允许远程对话（共用本地推理实例）';
+
+  @override
+  String get gatewaySerial => '为避免重复加载模型，仅允许一个推理任务；忙时返回 429。';
+
+  @override
+  String get gatewayTimeout => '请求超时（秒）';
+
+  @override
+  String get gatewayStopFirst => '修改端口或监听范围前，请先关闭网关。';
+
+  @override
+  String get gatewayFailure => '网关操作失败，请检查端口冲突及密令格式。';
+
+  @override
+  String get benchmarkTitle => '性能实验';
+
+  @override
+  String get benchmarkWarning => '实验会加载大模型并消耗电量；保持通风，系统过热时终止。结果不代表已达到 5 t/s。';
+
+  @override
+  String get benchmarkStart => '运行一次基准测试';
+
+  @override
+  String get benchmarkExport => '导出实验记录';
+
+  @override
+  String get benchmarkStop => '停止并释放模型';
+
+  @override
+  String get benchmarkModel => '已安装模型';
+
+  @override
+  String get benchmarkProfile => '后端与线程实验配置';
+
+  @override
+  String get benchmarkNoModel => '未找到可运行的已安装对话模型';
+
+  @override
+  String get benchmarkIdle => '尚未运行；仅保存参数和性能计数，不保存用户对话。';
+
+  @override
+  String get benchmarkRunning => '正在运行受控实验…';
+
+  @override
+  String get benchmarkDescription => '真机基准、内存压力与推理性能记录';
 
   @override
   String get appName => '司器';

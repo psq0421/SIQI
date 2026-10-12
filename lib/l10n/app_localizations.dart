@@ -101,6 +101,162 @@ abstract class AppLocalizations {
     Locale('zh', 'TW'),
   ];
 
+  /// No description provided for @lanGateway.
+  ///
+  /// In zh, this message translates to:
+  /// **'局域网网关'**
+  String get lanGateway;
+
+  /// No description provided for @lanGatewayEnable.
+  ///
+  /// In zh, this message translates to:
+  /// **'启用局域网网关'**
+  String get lanGatewayEnable;
+
+  /// No description provided for @lanGatewayRotateToken.
+  ///
+  /// In zh, this message translates to:
+  /// **'更换设备密令'**
+  String get lanGatewayRotateToken;
+
+  /// No description provided for @gatewaySafety.
+  ///
+  /// In zh, this message translates to:
+  /// **'密令加密存储，但 HTTP 不加密传输。只在可信 Wi-Fi、ADB 转发或自行配置的 TLS 隧道内使用。'**
+  String get gatewaySafety;
+
+  /// No description provided for @gatewayPort.
+  ///
+  /// In zh, this message translates to:
+  /// **'监听端口（1024–65535）'**
+  String get gatewayPort;
+
+  /// No description provided for @gatewayToken.
+  ///
+  /// In zh, this message translates to:
+  /// **'设备密令（24–256 位，无空格）'**
+  String get gatewayToken;
+
+  /// No description provided for @gatewaySave.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存设置'**
+  String get gatewaySave;
+
+  /// No description provided for @gatewayLoopback.
+  ///
+  /// In zh, this message translates to:
+  /// **'只监听本机（用于 USB / 加密隧道）'**
+  String get gatewayLoopback;
+
+  /// No description provided for @gatewayWifi.
+  ///
+  /// In zh, this message translates to:
+  /// **'仅允许可信 Wi-Fi 内访问'**
+  String get gatewayWifi;
+
+  /// No description provided for @gatewayModels.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许查询已安装对话模型'**
+  String get gatewayModels;
+
+  /// No description provided for @gatewayChat.
+  ///
+  /// In zh, this message translates to:
+  /// **'允许远程对话（共用本地推理实例）'**
+  String get gatewayChat;
+
+  /// No description provided for @gatewaySerial.
+  ///
+  /// In zh, this message translates to:
+  /// **'为避免重复加载模型，仅允许一个推理任务；忙时返回 429。'**
+  String get gatewaySerial;
+
+  /// No description provided for @gatewayTimeout.
+  ///
+  /// In zh, this message translates to:
+  /// **'请求超时（秒）'**
+  String get gatewayTimeout;
+
+  /// No description provided for @gatewayStopFirst.
+  ///
+  /// In zh, this message translates to:
+  /// **'修改端口或监听范围前，请先关闭网关。'**
+  String get gatewayStopFirst;
+
+  /// No description provided for @gatewayFailure.
+  ///
+  /// In zh, this message translates to:
+  /// **'网关操作失败，请检查端口冲突及密令格式。'**
+  String get gatewayFailure;
+
+  /// No description provided for @benchmarkTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'性能实验'**
+  String get benchmarkTitle;
+
+  /// No description provided for @benchmarkWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'实验会加载大模型并消耗电量；保持通风，系统过热时终止。结果不代表已达到 5 t/s。'**
+  String get benchmarkWarning;
+
+  /// No description provided for @benchmarkStart.
+  ///
+  /// In zh, this message translates to:
+  /// **'运行一次基准测试'**
+  String get benchmarkStart;
+
+  /// No description provided for @benchmarkExport.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出实验记录'**
+  String get benchmarkExport;
+
+  /// No description provided for @benchmarkStop.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止并释放模型'**
+  String get benchmarkStop;
+
+  /// No description provided for @benchmarkModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'已安装模型'**
+  String get benchmarkModel;
+
+  /// No description provided for @benchmarkProfile.
+  ///
+  /// In zh, this message translates to:
+  /// **'后端与线程实验配置'**
+  String get benchmarkProfile;
+
+  /// No description provided for @benchmarkNoModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'未找到可运行的已安装对话模型'**
+  String get benchmarkNoModel;
+
+  /// No description provided for @benchmarkIdle.
+  ///
+  /// In zh, this message translates to:
+  /// **'尚未运行；仅保存参数和性能计数，不保存用户对话。'**
+  String get benchmarkIdle;
+
+  /// No description provided for @benchmarkRunning.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在运行受控实验…'**
+  String get benchmarkRunning;
+
+  /// No description provided for @benchmarkDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'真机基准、内存压力与推理性能记录'**
+  String get benchmarkDescription;
+
   /// No description provided for @appName.
   ///
   /// In zh, this message translates to:
@@ -3430,6 +3586,72 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'已检测到模型文件'**
   String get modelFilesDetected;
+
+  /// No description provided for @cpuPerformance.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 与加速器调度'**
+  String get cpuPerformance;
+
+  /// No description provided for @cpuPerformanceDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'查看 CPU 核心并为端侧推理设置进程亲和性'**
+  String get cpuPerformanceDescription;
+
+  /// No description provided for @cpuCoreSelectionDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择的核心会应用到司器进程，并由推理工作线程继承。频率读取自 Android sysfs，可能随温控策略动态变化。'**
+  String get cpuCoreSelectionDescription;
+
+  /// No description provided for @cpuSmallCoreWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'不建议只选择 A5xx 能效小核运行大模型，否则吞吐可能明显下降。'**
+  String get cpuSmallCoreWarning;
+
+  /// No description provided for @cpuCore.
+  ///
+  /// In zh, this message translates to:
+  /// **'CPU 核心'**
+  String get cpuCore;
+
+  /// No description provided for @cpuApply.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用核心选择'**
+  String get cpuApply;
+
+  /// No description provided for @cpuApplied.
+  ///
+  /// In zh, this message translates to:
+  /// **'核心亲和性已应用到当前进程'**
+  String get cpuApplied;
+
+  /// No description provided for @cpuApplyFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'系统拒绝了核心亲和性请求'**
+  String get cpuApplyFailed;
+
+  /// No description provided for @npuStatus.
+  ///
+  /// In zh, this message translates to:
+  /// **'Hexagon NPU 状态'**
+  String get npuStatus;
+
+  /// No description provided for @npuEligible.
+  ///
+  /// In zh, this message translates to:
+  /// **'检测到可用 delegate；只有兼容 LiteRT-LM 的模型才会调用'**
+  String get npuEligible;
+
+  /// No description provided for @npuUnavailable.
+  ///
+  /// In zh, this message translates to:
+  /// **'当前设备不可用或尚未验证'**
+  String get npuUnavailable;
 }
 
 class _AppLocalizationsDelegate

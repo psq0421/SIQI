@@ -13,6 +13,8 @@ import 'diagnostics_page.dart';
 import 'permission_privacy_page.dart';
 import 'shell_settings_page.dart';
 import 'lan_gateway_page.dart';
+import 'performance_lab_page.dart';
+import 'cpu_performance_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -70,10 +72,22 @@ class SettingsPage extends StatelessWidget {
             page: const AboutPage(),
           ),
           (
-            title: '局域网网关',
-            subtitle: '端口 1158 的加密局域网控制台',
+            title: context.l10n.lanGateway,
+            subtitle: context.l10n.gatewaySafety,
             glyph: SiqiGlyph.globe,
             page: const LanGatewayPage(),
+          ),
+          (
+            title: context.l10n.benchmarkTitle,
+            subtitle: context.l10n.benchmarkDescription,
+            glyph: SiqiGlyph.sparkles,
+            page: const PerformanceLabPage(),
+          ),
+          (
+            title: context.l10n.cpuPerformance,
+            subtitle: context.l10n.cpuPerformanceDescription,
+            glyph: SiqiGlyph.sparkles,
+            page: const CpuPerformancePage(),
           ),
         ];
     return Column(

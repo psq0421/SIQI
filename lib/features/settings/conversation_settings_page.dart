@@ -29,7 +29,6 @@ class _ConversationSettingsPageState
     32768,
     65536,
     131072,
-    262144,
   ];
   static const _outputOptions = <int>[
     256,

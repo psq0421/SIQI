@@ -9,6 +9,91 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get lanGateway => 'LAN gateway';
+
+  @override
+  String get lanGatewayEnable => 'Enable LAN gateway';
+
+  @override
+  String get lanGatewayRotateToken => 'Rotate device token';
+
+  @override
+  String get gatewaySafety =>
+      'Tokens are encrypted at rest, but HTTP is not encrypted in transit. Use trusted Wi-Fi, ADB forwarding, or your own TLS tunnel.';
+
+  @override
+  String get gatewayPort => 'Listen port (1024–65535)';
+
+  @override
+  String get gatewayToken => 'Device token (24–256 characters, no spaces)';
+
+  @override
+  String get gatewaySave => 'Save settings';
+
+  @override
+  String get gatewayLoopback => 'Loopback only (USB / encrypted tunnel)';
+
+  @override
+  String get gatewayWifi => 'Allow trusted Wi-Fi access only';
+
+  @override
+  String get gatewayModels => 'Allow installed chat model listing';
+
+  @override
+  String get gatewayChat => 'Allow remote chat (shared local engine)';
+
+  @override
+  String get gatewaySerial =>
+      'One inference at a time prevents duplicate model allocations; busy requests receive 429.';
+
+  @override
+  String get gatewayTimeout => 'Request timeout (seconds)';
+
+  @override
+  String get gatewayStopFirst =>
+      'Stop the gateway before changing port or bind scope.';
+
+  @override
+  String get gatewayFailure =>
+      'Gateway operation failed. Check port conflicts and token format.';
+
+  @override
+  String get benchmarkTitle => 'Performance lab';
+
+  @override
+  String get benchmarkWarning =>
+      'Experiments load large models and consume power. Keep ventilation; stop on severe system heat. Results do not imply 5 t/s has been achieved.';
+
+  @override
+  String get benchmarkStart => 'Run benchmark';
+
+  @override
+  String get benchmarkExport => 'Export experiment records';
+
+  @override
+  String get benchmarkStop => 'Stop and release model';
+
+  @override
+  String get benchmarkModel => 'Installed model';
+
+  @override
+  String get benchmarkProfile => 'Backend / thread experiment profile';
+
+  @override
+  String get benchmarkNoModel => 'No installed runnable chat models found';
+
+  @override
+  String get benchmarkIdle =>
+      'Not run yet. Only parameters and performance counters are saved; no user conversations.';
+
+  @override
+  String get benchmarkRunning => 'Running controlled experiment…';
+
+  @override
+  String get benchmarkDescription =>
+      'Device benchmarks, memory pressure, and inference metrics';
+
+  @override
   String get appName => 'SIQI';
 
   @override
@@ -1890,4 +1975,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get modelFilesDetected => 'Model files detected';
+
+  @override
+  String get cpuPerformance => 'CPU and accelerator tuning';
+
+  @override
+  String get cpuPerformanceDescription =>
+      'Inspect CPU cores and apply a process affinity for local inference';
+
+  @override
+  String get cpuCoreSelectionDescription =>
+      'Selected cores are applied to the SIQI process and inherited by inference workers. Frequencies are read from Android sysfs and may change with thermal policies.';
+
+  @override
+  String get cpuSmallCoreWarning =>
+      'Avoid selecting only A5xx efficiency cores for large-model inference; throughput may drop sharply.';
+
+  @override
+  String get cpuCore => 'CPU core';
+
+  @override
+  String get cpuApply => 'Apply core selection';
+
+  @override
+  String get cpuApplied => 'Core affinity applied to this process';
+
+  @override
+  String get cpuApplyFailed => 'The system rejected the core affinity request';
+
+  @override
+  String get npuStatus => 'Hexagon NPU status';
+
+  @override
+  String get npuEligible =>
+      'Eligible delegate detected; only compatible LiteRT-LM models can use it';
+
+  @override
+  String get npuUnavailable => 'Not available or not verified for this device';
 }

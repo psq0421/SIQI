@@ -102,6 +102,7 @@ Available variables: {user_name}, {current_time}.
     this.harnessApiProfileId,
     this.developerMode = false,
     this.generatedProjectsPath = '/storage/emulated/0/Siqi/Projects',
+    this.selectedCpuCores = const [],
   });
 
   final bool onboardingComplete;
@@ -134,6 +135,7 @@ Available variables: {user_name}, {current_time}.
   final String? harnessApiProfileId;
   final bool developerMode;
   final String generatedProjectsPath;
+  final List<int> selectedCpuCores;
 
   AppSettings copyWith({
     bool? onboardingComplete,
@@ -169,6 +171,7 @@ Available variables: {user_name}, {current_time}.
     bool clearHarnessApiProfileId = false,
     bool? developerMode,
     String? generatedProjectsPath,
+    List<int>? selectedCpuCores,
   }) => AppSettings(
     onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     userName: userName ?? this.userName,
@@ -207,6 +210,7 @@ Available variables: {user_name}, {current_time}.
         : harnessApiProfileId ?? this.harnessApiProfileId,
     developerMode: developerMode ?? this.developerMode,
     generatedProjectsPath: generatedProjectsPath ?? this.generatedProjectsPath,
+    selectedCpuCores: selectedCpuCores ?? this.selectedCpuCores,
   );
 
   Map<String, Object?> toJson() => {
@@ -240,6 +244,7 @@ Available variables: {user_name}, {current_time}.
     'harnessApiProfileId': harnessApiProfileId,
     'developerMode': developerMode,
     'generatedProjectsPath': generatedProjectsPath,
+    'selectedCpuCores': selectedCpuCores,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -255,7 +260,12 @@ Available variables: {user_name}, {current_time}.
     timestampStyle: TimestampStyle.values.byName(
       json['timestampStyle'] as String? ?? 'relative',
     ),
-    contextWindow: json['contextWindow'] as int? ?? 32768,
+    // Beta3 caps the user-facing context at 128K. Older installations may
+    // Older installations may have a value above the new product cap;
+    // migrate it safely instead of attempting an oversized KV allocation.
+    contextWindow: ((json['contextWindow'] as num?)?.toInt() ?? 32768)
+        .clamp(2048, 131072)
+        .toInt(),
     temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
     topP: (json['topP'] as num?)?.toDouble() ?? 0.9,
     maxTokens: json['maxTokens'] as int? ?? 4096,
@@ -288,6 +298,11 @@ Available variables: {user_name}, {current_time}.
     generatedProjectsPath:
         json['generatedProjectsPath'] as String? ??
         '/storage/emulated/0/Siqi/Projects',
+    selectedCpuCores: (json['selectedCpuCores'] as List? ?? const [])
+        .whereType<num>()
+        .map((value) => value.toInt())
+        .where((value) => value >= 0 && value < 63)
+        .toList(),
   );
 }
 

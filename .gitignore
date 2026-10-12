@@ -10,6 +10,7 @@ android/local.properties
 android/app/debug/
 android/app/profile/
 android/app/release/
+android/app/.cxx/
 android/key.properties
 *.jks
 *.keystore

@@ -36,6 +36,7 @@ import '../services/workspace_service.dart';
 import '../services/external_model_service.dart';
 import '../services/runtime_spill_service.dart';
 import '../services/local_gateway_service.dart';
+import '../services/performance_benchmark_service.dart';
 
 final sharedPreferencesProvider = Provider<SharedPreferences>(
   (ref) => throw UnimplementedError(),
@@ -86,6 +87,12 @@ final localInferenceServiceProvider = Provider((ref) {
   ref.onDispose(service.dispose);
   return service;
 });
+final performanceBenchmarkServiceProvider = Provider(
+  (ref) => PerformanceBenchmarkService(
+    ref.watch(platformServiceProvider),
+    ref.watch(localInferenceServiceProvider),
+  ),
+);
 final platformServiceProvider = Provider((ref) => const PlatformService());
 final permissionServiceProvider = Provider(
   (ref) => PermissionService(ref.watch(localDatabaseProvider)),
@@ -96,6 +103,9 @@ final localGatewayServiceProvider = Provider(
   (ref) => LocalGatewayService(
     ref.watch(secureKeyServiceProvider).storage,
     ref.watch(sharedPreferencesProvider),
+    ref.watch(localInferenceServiceProvider),
+    ref.watch(modelDownloadServiceProvider),
+    ref.watch(platformServiceProvider),
   ),
 );
 final fileContentServiceProvider = Provider((ref) => FileContentService());

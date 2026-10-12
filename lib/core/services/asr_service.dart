@@ -189,11 +189,9 @@ class AsrService {
 
   Future<void> _guardMemory(int modelBytes) async {
     final memory = await _platform.deviceMemory();
-    final totalBudget = (memory.totalBytes * .85).floor();
     const workingReserve = 384 * 1024 * 1024;
-    if (modelBytes + workingReserve > totalBudget ||
-        workingReserve >
-            memory.availableBytes - memory.lowMemoryThresholdBytes) {
+    if (modelBytes + workingReserve >
+        memory.availableBytes - memory.lowMemoryThresholdBytes) {
       throw const LocalTaskException('insufficient-memory');
     }
   }

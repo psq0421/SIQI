@@ -1,6 +1,7 @@
 analyzer:
   exclude:
     - build/**
+    - third_party/llamadart/**
     - android/**
     - ios/**
     - web/**

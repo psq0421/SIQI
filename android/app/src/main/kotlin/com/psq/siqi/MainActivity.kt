@@ -19,6 +19,7 @@ import java.io.FileOutputStream
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.regex.Pattern
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -27,6 +28,13 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var pendingCameraResult: MethodChannel.Result? = null
     private var pendingCameraPath: String? = null
+
+    companion object {
+        init { System.loadLibrary("siqi_platform") }
+        @JvmStatic private external fun setCpuAffinityNative(mask: Long): Boolean
+        private const val PLATFORM_CHANNEL = "com.psq.siqi/platform"
+        private const val CAMERA_REQUEST_CODE = 1158
+    }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
         MethodChannel(
@@ -41,6 +49,35 @@ class MainActivity : FlutterActivity() {
                     result.success(storageStatus(path))
                 }
                 "runtimeInfo" -> result.success(runtimeInfo())
+                "setCpuAffinity" -> {
+                    val cores = call.argument<List<Number>>("cores") ?: emptyList()
+                    val mask = cores.fold(0L) { value, core ->
+                        val index = core.toInt()
+                        if (index in 0..62) value or (1L shl index) else value
+                    }
+                    result.success(mask != 0L && setCpuAffinityNative(mask))
+                }
+                "configureInferenceScratch" -> {
+                    val modelBytes = call.argument<Number>("modelBytes")?.toLong() ?: 0L
+                    val enabled = call.argument<Boolean>("enabled") ?: false
+                    val soc = if (Build.VERSION.SDK_INT >= 31) Build.SOC_MODEL else ""
+                    val supported = soc.equals("SM8475", ignoreCase = true)
+                    val directory = File(cacheDir, "inference-scratch")
+                    val enough = StatFs(cacheDir.absolutePath).availableBytes > modelBytes + 1024L * 1024 * 1024
+                    val ready = enabled && supported && enough && (directory.exists() || directory.mkdirs())
+                    try {
+                        android.system.Os.setenv("SIQI_REPACK_CACHE_DIR", if (ready) directory.absolutePath else "", true)
+                        result.success(ready)
+                    } catch (_: Exception) { result.success(false) }
+                }
+                "processStats" -> Thread {
+                    try {
+                        val stats = processStats(call.argument<Boolean>("includePss") ?: false)
+                        runOnUiThread { result.success(stats) }
+                    } catch (error: Exception) {
+                        runOnUiThread { result.error("stats-unavailable", error.message, null) }
+                    }
+                }.start()
                 "captureWithSystemCamera" -> captureWithSystemCamera(result)
                 "openFile" -> {
                     val path = call.argument<String>("path")
@@ -130,6 +167,31 @@ class MainActivity : FlutterActivity() {
         val swaps = readSwaps()
         val zramTotal = readLongFile("/sys/block/zram0/disksize")
         val zramUsed = readLongFile("/sys/block/zram0/mem_used_total")
+        val cpuInfo = cpuTopology()
+        val cpuText = try { File("/proc/cpuinfo").readText() } catch (_: Exception) { "" }
+        val architecture = Regex("CPU architecture\\s*:\\s*(\\d+)").find(cpuText)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: 0
+        val soc = if (Build.VERSION.SDK_INT >= 31) Build.SOC_MODEL else ""
+        // Android kernels commonly report `CPU architecture: 8` even for
+        // Armv9 implementations. CPU part IDs and SVE2 are therefore used as
+        // conservative capability evidence; this is a candidate flag, not a
+        // claim that an NPU delegate is active.
+        val hasArmV9Part = cpuInfo.any { (it["part"] as? String)?.lowercase() in setOf(
+            "0xd46", "0xd47", "0xd48", "0xd4d", "0xd4f", "0xd80", "0xd81"
+        ) }
+        val armV9 = architecture >= 9 || hasArmV9Part || cpuText.contains("sve2", ignoreCase = true)
+        val hexagonDevice = File("/sys/class/misc").listFiles()?.any {
+            it.name.contains("hexagon", true) || it.name.contains("adspr", true) || it.name.contains("cdsp", true)
+        } == true
+        val npuRuntime = listOf(
+            "/vendor/lib64/libQnnHtp.so",
+            "/vendor/lib64/libQnnHtpV73.so",
+            "/vendor/lib64/libhexagon_nn_skel.so",
+            "/system/lib64/libQnnHtp.so",
+        ).any { File(it).exists() }
+        val eliteFamily = soc.uppercase().let {
+            it.startsWith("SM8750") || it.startsWith("SM8850") ||
+                it.startsWith("SM8950") || it.startsWith("SM8970")
+        }
         return mapOf(
             "sdkInt" to Build.VERSION.SDK_INT,
             "processorCount" to Runtime.getRuntime().availableProcessors(),
@@ -138,7 +200,110 @@ class MainActivity : FlutterActivity() {
             "zramTotalBytes" to zramTotal,
             "zramUsedBytes" to zramUsed,
             "swapTotalBytes" to swaps.first,
-            "swapFreeBytes" to swaps.second
+            "swapFreeBytes" to swaps.second,
+            "socModel" to soc,
+            "armVersion" to architecture,
+            "armV9Candidate" to armV9,
+            "hexagonDevice" to hexagonDevice,
+            "hexagonNpuRuntime" to npuRuntime,
+            // QNN HTP/Hexagon NN libraries are stronger evidence than the
+            // often-hidden /sys/class entry on vendor Android builds.
+            "npuOptimizationEligible" to (armV9 && npuRuntime),
+            "npuOptimizationProfile" to when {
+                armV9 && eliteFamily && npuRuntime -> "qualcomm-hexagon-elite"
+                armV9 && npuRuntime -> "qualcomm-hexagon-armv9"
+                else -> "unverified"
+            },
+            "cpuCores" to cpuInfo
+        )
+    }
+
+    private fun cpuTopology(): List<Map<String, Any>> {
+        val text = try { File("/proc/cpuinfo").readText() } catch (_: Exception) { "" }
+        val parts = mutableMapOf<Int, String>()
+        for (block in text.split(Regex("\\n\\s*\\n"))) {
+            val id = Regex("processor\\s*:\\s*(\\d+)").find(block)?.groupValues?.getOrNull(1)?.toIntOrNull() ?: continue
+            val part = Regex("CPU part\\s*:\\s*(0x[0-9a-fA-F]+)").find(block)?.groupValues?.getOrNull(1) ?: ""
+            parts[id] = part
+        }
+        val root = File("/sys/devices/system/cpu")
+        return root.listFiles()?.mapNotNull { dir ->
+            val match = Regex("cpu(\\d+)").matchEntire(dir.name) ?: return@mapNotNull null
+            val id = match.groupValues[1].toIntOrNull() ?: return@mapNotNull null
+            val khz = readLongFile(File(dir, "cpufreq/cpuinfo_max_freq").absolutePath)
+            mapOf<String, Any>(
+                "id" to id,
+                "maxFrequencyHz" to khz * 1000L,
+                "part" to (parts[id] ?: ""),
+                "architecture" to cpuPartName(parts[id] ?: "")
+            )
+        }?.sortedBy { it["id"] as Int } ?: emptyList()
+    }
+
+    private fun cpuPartName(part: String): String = when (part.lowercase()) {
+        "0xd05" -> "Cortex-A55"
+        "0xd0b" -> "Cortex-A76"
+        "0xd41" -> "Cortex-A78"
+        "0xd44" -> "Cortex-X1"
+        "0xd46" -> "Cortex-A510"
+        "0xd47" -> "Cortex-A710"
+        "0xd48" -> "Cortex-X2"
+        "0xd4d" -> "Cortex-A720"
+        "0xd4f" -> "Cortex-X3"
+        "0xd80" -> "Cortex-X4"
+        "0xd81" -> "Cortex-X925"
+        else -> if (part.isBlank()) "Unknown ARM core" else "ARM part $part"
+    }
+
+    /** Lightweight, privacy-safe counters used by the Beta3 benchmark screen.
+     * No prompts, API keys, or file contents are included. */
+    private fun processStats(includePss: Boolean): Map<String, Any> {
+        var rss = 0L
+        var pss = 0L
+        var swapPss = 0L
+        var minorFaults = 0L
+        var majorFaults = 0L
+        try {
+            File("/proc/self/status").forEachLine { line ->
+                when {
+                    line.startsWith("VmRSS:") -> rss = line.filter { it.isDigit() }.toLongOrNull()?.times(1024) ?: 0L
+                    line.startsWith("VmPSS:") -> pss = line.filter { it.isDigit() }.toLongOrNull()?.times(1024) ?: 0L
+                }
+            }
+            val stat = File("/proc/self/stat").readText().substringAfterLast(") ").trim().split(Regex("\\s+"))
+            if (stat.size > 9) {
+                minorFaults = stat[7].toLongOrNull() ?: 0L
+                majorFaults = stat[9].toLongOrNull() ?: 0L
+            }
+            // Walking a multi-GB mapping for PSS is expensive. The pressure
+            // watchdog only needs RSS/thermal; research sampling opts in.
+            if (includePss) {
+                val debugMemory = android.os.Debug.MemoryInfo()
+                android.os.Debug.getMemoryInfo(debugMemory)
+                pss = debugMemory.totalPss.toLong() * 1024
+                swapPss = debugMemory.totalSwappablePss.toLong() * 1024
+            }
+        } catch (_: Exception) {
+            // Some Android builds restrict procfs fields; return best effort.
+        }
+        val battery = try {
+            val intent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+            val level = intent?.getIntExtra(android.os.BatteryManager.EXTRA_LEVEL, -1) ?: -1
+            val scale = intent?.getIntExtra(android.os.BatteryManager.EXTRA_SCALE, 100) ?: 100
+            if (level >= 0 && scale > 0) ((level.toDouble() / scale) * 100).toLong() else -1L
+        } catch (_: Exception) { -1L }
+        val batteryIntent = registerReceiver(null, android.content.IntentFilter(android.content.Intent.ACTION_BATTERY_CHANGED))
+        val power = getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+        return mapOf(
+            "rssBytes" to rss,
+            "pssBytes" to pss,
+            "swapPssBytes" to swapPss,
+            "minorFaults" to minorFaults,
+            "majorFaults" to majorFaults,
+            "batteryPercent" to battery,
+            "batteryTemperatureDeciC" to (batteryIntent?.getIntExtra(android.os.BatteryManager.EXTRA_TEMPERATURE, -1) ?: -1),
+            "thermalStatus" to power.currentThermalStatus,
+            "timestampMs" to System.currentTimeMillis()
         )
     }
 
@@ -148,6 +313,13 @@ class MainActivity : FlutterActivity() {
 
     private fun readSwaps(): Pair<Long, Long> {
         return try {
+            // /proc/swaps is frequently blocked by Android SELinux even when
+            // /proc/meminfo is readable. Do not silently report zero swap.
+            val meminfo = File("/proc/meminfo").readLines()
+            fun value(key: String): Long = meminfo.firstOrNull { it.startsWith("$key:") }
+                ?.substringAfter(":")?.trim()?.substringBefore(" ")?.toLongOrNull()?.times(1024) ?: 0L
+            val swapTotal = value("SwapTotal")
+            if (swapTotal > 0) return swapTotal to value("SwapFree")
             val lines = File("/proc/swaps").readLines().drop(1)
             var total = 0L
             var used = 0L
@@ -440,8 +612,4 @@ class MainActivity : FlutterActivity() {
         file.write(header.array())
     }
 
-    companion object {
-        private const val PLATFORM_CHANNEL = "com.psq.siqi/platform"
-        private const val CAMERA_REQUEST_CODE = 1158
-    }
 }

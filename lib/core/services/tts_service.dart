@@ -118,12 +118,10 @@ class TtsService {
 
   Future<void> _guardMemory(int modelBytes) async {
     final memory = await _platform.deviceMemory();
-    final totalBudget = (memory.totalBytes * .85).floor();
     final availableBudget =
         memory.availableBytes - memory.lowMemoryThresholdBytes;
     const workingReserve = 256 * 1024 * 1024;
-    if (modelBytes + workingReserve > totalBudget ||
-        workingReserve > availableBudget) {
+    if (modelBytes + workingReserve > availableBudget) {
       throw const LocalTaskException('insufficient-memory');
     }
   }
