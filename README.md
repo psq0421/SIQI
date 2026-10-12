@@ -1,27 +1,19 @@
 # 司器（SIQI）
 
+<img width="128" height="128" alt="8efac9b20e5f077607c5847706c7af33" src="https://github.com/user-attachments/assets/84e5fb61-2804-4cb6-a98e-a9fecf508c48" />
+
+English：[README_EN.md](https://github.com/psq0421/SIQI/edit/master/README_EN.md)
+
 司器是一款面向 Android 的端侧优先 AI 工作站。会话、配置、API 密钥、模型记录、工作区信息、权限审计、工作日志和缓存索引均保存在本机；联网只用于用户明确配置的 API、模型下载、MCP 目录同步、GitHub 导入和官方资源访问。
 
 应用 ID：`com.psq.siqi`  
 最低版本：Android 10（API 29）  
 当前目标版本：Android 17（API 37）  
 Flutter：stable 3.47.0 或更高兼容版本  
-当前版本：`1.0.0-beta.2+4100`
+当前版本：`1.0.0-beta.1+4006`  
 源代码许可：MIT License
 
 > MIT 许可允许个人及商业使用。模型、MCP 服务、Harness 运行包和其他第三方资源仍分别受其自身许可证与服务条款约束。
-
-<p align="center">
-  <img src="assets/branding/siqi_brand.jpg" alt="司器 SIQI 品牌图" width="180">
-</p>
-
-<p align="center"><em>端侧优先的 AI 工作站：模型、会话、工作区和日志尽可能留在设备本地。</em></p>
-
-![司器本地优先架构](docs/images/siqi-architecture.svg)
-
-![司器四层工作机制：交互、编排、执行、数据安全](docs/images/siqi-workflows.svg)
-
-上面的配图概括了司器的两条核心原则：本地推理与本地数据优先；网络只在用户明确配置 API、模型下载、MCP 或 GitHub 导入时使用。
 
 ### Beta2（build 4100）
 
@@ -30,24 +22,24 @@ Flutter：stable 3.47.0 或更高兼容版本
 - 将 Harness 置于实验室顶部，移除工作站概览，完成 LAN Gateway 中文化。
 - 增加 GPT‑OSS‑20B、Qwen3‑8B 量化模型入口和多种外部模型格式导入。
 
-完整变更记录见 [`CHANGELOG_BETA2.md`](CHANGELOG_BETA2.md)。
+完整变更记录见 [`CHANGELOG_BETA2.md`]
 
 ### Beta1（build 4006）
 
-- 保持 Alpha3 全部功能和界面体验，发行包统一为具备完整端侧推理能力的 arm64-v8a 架构。
+- 保持 Alpha2 全部功能和界面体验，发行包统一为具备完整端侧推理能力的 arm64-v8a 架构。
 - 压缩 APK 内的 llama.cpp、ONNX Runtime、Sherpa-ONNX 等原生运行库，安装后由 Android 自动解压，不改变推理结果与模型兼容性。
 - 移除未使用的代码生成链和重复直接依赖，缩短依赖解析与构建路径。
 - Release APK 从 Alpha3 的 247.5 MB 降至 39.2 MiB，减少约 84.2%；Debug 保留调试符号与开发运行时，因此体积显著更大。
-
-### Alpha3（build 4005）
-
 - 全新安装时自动创建应用专属的 `Projects`、`Models`、`Exports`、`Logs`、`Cache` 目录，并将工作区和模型目录初始化到可直接读写的位置，修复首次选目录被统一判定为不可写的问题。
 - 权限页新增传统文件读写权限和可选“所有文件访问”。后者只由用户主动打开 Android 专用设置页，不在启动时强制申请；Root 仍不申请。
 - 端侧推理、TTS 与 ASR 的物理内存保护上限由 60% 放宽至 85%。
-- 一个 API Key 配置可管理多个模型；应用从 Base URL 自动获取可用模型列表，并支持备注、默认兜底模型、思考能力标记、思考强度和可选的输入/输出 Token 计费。
+- 一个 API Key 配置可管理多个模型映射，并支持备注、默认兜底模型、请求地址、自定义 Headers 和可选的输入/输出 Token 计费。
 
 ## 当前实现
 
+### 图示，凑活看吧
+<img width="1400" height="820" alt="download" src="https://github.com/user-attachments/assets/06c49132-2323-49d4-90a3-2f1531db092f" /><svg xmlns="http://www.w3.org/2000/svg" width="1400" height="820" viewBox="0 0 1400 820" role="img" aria-labelledby="title desc">
+ 
 ### 对话工作台
 
 - Chat：标准问答、会话历史、本地搜索、流式响应、附件能力检测。
@@ -228,8 +220,8 @@ Shell 具备命令历史、消息队列、工作目录、超时、输出截断�
 
 1. 打开“设置 → API 配置”。
 2. 选择厂商模板或兼容格式。
-3. 填写供应商名称、备注、请求地址和 API Key。
-4. 点击“获取模型列表”，由应用从 Base URL 的模型接口自动读取可用模型；选择需要启用的模型、支持思考的模型与默认兜底模型，无需手动填写模型 ID。
+3. 填写供应商名称、备注、请求地址、API Key 和可选 Headers。
+4. 填写默认兜底模型；如一枚 Key 可调用多个模型，可按“显示名称 = 上游模型 ID”逐行添加映射。
 5. 标记模型是否支持多模态，并可选填币种、输入单价和输出单价（每百万 Tokens）。
 6. 点击“测试连接”。未测试的配置不能用于对话；测试使用默认兜底模型。
 
