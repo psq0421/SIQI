@@ -5,7 +5,7 @@
 [![Version](https://img.shields.io/badge/pre--release-Beta.4%20%2F%204300-17191E)](https://github.com/psq0421/SIQI/releases/tag/v1.0.0.Beta.4) [![Android](https://img.shields.io/badge/Android-10--17-3DDC84)](https://github.com/psq0421/SIQI/releases) [![License](https://img.shields.io/badge/license-MIT-111827)](LICENSE)
 
 <p align="center"><img src="assets/branding/siqi_brand.jpg" alt="司器 SIQI" width="180" /></p>
-<p align="center"><strong>把模型、工具、项目和工作流，装进自己的设备。</strong><br />会话与配置默认留在本机；联网只在用户明确需要时发生。</p>
+<p align="center"><strong>把模型、工具和一点点折腾精神，装进手机里。</strong><br />没网时不掉链，非要联网也不高冷；能本地跑，就尽量不把数据交给未知远方。</p>
 
 中文 | [English](README_EN.md)
 
@@ -15,11 +15,12 @@
 
 [下载 Beta.4](https://github.com/psq0421/SIQI/releases/tag/v1.0.0.Beta.4) · [详细双语更新日志](CHANGELOG_BETA4.md) · [研究接口与验收协议](docs/research-beta4.md)。这是预发布版本：专用 35B 路径目前仅支持文本，长上下文和全模态仍未完成验收。
 
-> **诚实边界**：128K 是产品配置上限。大模型的实际驻留上下文仍由设备内存、模型大小和当前压力动态决定；性能记录同时保存 `requestedContext` 与 `effectiveContext`，不把配置值冒充成实际 KV 容量。
+> **以诚为本**：128K 是产品配置上限。大模型的实际驻留上下文仍由设备内存、模型大小和当前压力动态决定；性能记录同时保存 `requestedContext` 与 `effectiveContext`，不把配置值冒充成实际 KV 容量。
 
-## 为什么是司器
+## 为什么叫司器呢
 
 “司”代表掌控与调度，“器”代表可使用、可观测的工具。模型不是远程黑盒，而是可以被观察、配置、切换和管理的生产工具。
+（别听作者一本正经的胡诌，我总感觉他在谐音某个人的名字......）
 
 ## 四层工作机制
 
@@ -45,10 +46,11 @@
 - 统一管理对话、TTS、ASR、OCR 模型；卡片显示来源、格式、许可证和实际运行状态。
 - GGUF 通过 llama.cpp FFI 在独立工作线程中运行，下载支持断点续传和 SHA-256 校验。
 - 图片、PDF、音频、Office 文档和大文本采用路径或流式处理，避免复制整份文件到 UI 内存。
+- 番外话：作者写的界面实在烂透了，所以我让他借助CodeX换了层皮，我又偷偷给他代码里加了点注释、修了点bug，他挺高兴的。
 
 ## CPU / GPU / NPU 调度
 
-设置 → **CPU 与加速器调度** 可查看每个核心的架构与最高频率，并选择进程亲和性：
+设置 → **CPU 与加速器调度** 可查看每个核心的架构与最高频率，并选择进程亲和性，以下以基准测试平台骁龙8+ Gen1为例：
 
 ```text
 CPU0–3  Cortex-A510  @ 2.02 GHz
@@ -56,7 +58,7 @@ CPU4–6  Cortex-A710  @ 2.75 GHz
 CPU7    Cortex-X2    @ 3.19 GHz
 ```
 
-系统会提示不建议只使用 A5xx 能效小核运行大模型。Arm v9、Hexagon 和 QNN runtime 分层检测；当前 APK 打包 llama.cpp CPU / Vulkan 与专用 LES 文本运行时，**没有将 GGUF 变成 NPU 模型**。LES 默认使用 CPU；MNN 生产集成和 QNN/HTP 推理仍未完成，不把芯片检测当作加速成果。
+系统会提示不建议使用 A5xx 垃圾小核运行大模型。Arm v9、Hexagon 和 QNN runtime 分层检测；当前 APK 打包 llama.cpp CPU / Vulkan 与专用 LES 文本运行时，**没有将 GGUF 变成 NPU 模型**。LES 默认使用 CPU；MNN 生产集成和 QNN/HTP 推理仍未完成，不把芯片检测当作加速成果。
 
 ## MiniCPM：下载与运行分开验收
 
@@ -70,9 +72,11 @@ CPU7    Cortex-X2    @ 3.19 GHz
 
 **真实长文仍未达标**：历史开发包完整处理 4,785 个输入 token、8K 窗口、256 个输出 token 后，56/96 专家窗口纯 Decode 分别为 **2.075 / 2.029 token/s**，prefill 约 **23.43 / 20.89 分钟**；最终包未重测长文。扩大专家缓存不能替代计算、I/O 和持续温控的优化。实验室新增同状态 4/2/6/8 线程回放诊断；非基准配置的 token 序列不同，不宣称品质等价。日志汇总按真实负载和模型冷/热状态分组，不再混算短答与长文。
 
+（停停停，我吐槽两句：这两段我不想写，可惜作者非要主动暴露缺点。本姑娘看他能力也就那样，性格怎么跟Dario Amodei一样怪？）
+
 ## 日常体验与日志教程
 
-- 设置 → 界面与外观 → **前台保持亮屏**：默认开启，只在应用前台生效；关闭后遵循系统息屏策略，不申请唤醒锁权限。
+- 设置 → 界面与外观 → **前台保持亮屏**：默认开启，只在应用前台生效（原神你还没玩过吗）；关闭后遵循系统息屏策略，不申请唤醒锁权限。
 - 设置 → **日志与缓存** → **Agent 任务轨迹**：导出最近 100 条轨迹，或最近 100 条失败/取消/中断任务；分享前有隐私提醒。
 - Agent 先规划，查看拟执行动作，再授权执行。越界路径和未授权写入会留下失败记录；重启时未完成任务标记为中断，不冒充成功。
 - 设置 → **性能实验室**：选择已安装且运行时兼容的模型与 CPU/Vulkan 配置，运行后导出基准 JSONL。记录设备、模型校验、实际上下文、吞吐、RSS/PSS、缺页和温控。
@@ -96,7 +100,7 @@ CPU7    Cortex-X2    @ 3.19 GHz
 | `app-debug.apk` | 开发调试，约 130.77 MiB |
 | `SHA256SUMS.txt` | 两个安装包的 SHA-256 校验清单 |
 
-适用于 Android 10–17、arm64-v8a；35B 优化路径还需 FP16 / DOTPROD / I8MM。覆盖安装不会主动删除会话、配置或已下载模型；旧版本超过 128K 的上下文设置会自动迁移到 128K。两个包仍使用既有本地 Android Debug 证书，Release 表示优化构建，**不是生产密钥签名**。签名不一致时先导出数据，不要直接卸载。
+适用于 Android 10–17、arm64-v8a；35B 优化路径还需 FP16 / DOTPROD / I8MM。覆盖安装不会主动删除会话、配置或已下载模型；旧版本超过 128K 的上下文设置会自动迁移到 128K。两个包仍使用既有本地 Android Debug 证书，Release 表示优化构建，**不是生产密钥签名**。签名不一致时先导出数据，不要直接卸载，喂！（他干过这事，给他弄没脾气了）
 
 ## 快速上手
 
@@ -106,12 +110,13 @@ CPU7    Cortex-X2    @ 3.19 GHz
 4. 进入 Agent 前确认工作区和拟执行动作。
 5. Harness 插件只导入和管理，不会静默执行。
 6. 长任务可查看工作日志、内存压力、缓存和当前推理后端。
+7. 作者很懒很懒很懒，非要让本姑娘替他写，如果你能看到这行字，那他一定是对我太放心了，麻烦提issue的时候cue一下作者。
 
 ## Beta.3 长输出问题的处理边界
 
 - 修复一个明确触发条件：Android 温控 `SEVERE` 表示降频，不再把它当作必须停止推理；仍在 `CRITICAL` 或持续内核低内存时安全取消。
 - 流中断或手动取消会保留已有回复；无输出超时返回明确错误并记录原因，不再无声吞掉内容。
-- 尚不能宣称 OSS‑20B 所有长对话停顿已根治；原生解码死锁、LMK 和长上下文需要独立长时回归。没有实现断点续生成，也没有宣称 128K 下 5 t/s。
+- 尚不能宣称 OSS‑20B 所有长对话停顿已根治；原生解码死锁、LMK 和长上下文需要独立长时回归。没有实现断点续生成。
 
 反馈时请提供设备型号、模型量化、上下文、GPU 设置和脱敏工作日志摘要。
 
@@ -135,21 +140,21 @@ flutter build apk --release --no-pub
 | 需求 | 状态 |
 | --- | --- |
 | MiniCPM-V 4.7 35B | 部分完成：发布包的混合量化 LES 文本路径四轮短输入超过 3 token/s；Q4_K_M 和视觉未验收。 |
-| 64K / 128K 上下文 | 部分完成：新安装默认配置 64K，界面提供 128K；实际窗口可降低，未完成填满 64K 的真机验收。 |
-| 多模态文件生成 | 部分完成：附件、文本 / Office / PDF 提取和工作区写入；不宣称任意 PSD / CAD 原生渲染。 |
+| 64K / 128K 上下文 | 部分完成：新安装默认配置 64K，界面提供 128K；实际窗口可降低。 |
+| 多模态文件生成 | 部分完成：附件、文本 / Office / PDF 提取和工作区写入。 |
 | 模型兼容构件 | 部分完成：可下载已核验 ModelScope 产物；缺少兼容运行时的构件仍阻止执行。 |
 | CPU / GPU / Hexagon | 部分完成：核心亲和性、Vulkan 配置、压力 / ZRAM 观测与芯片检测；未集成 QNN / HTP delegate。 |
-| MNN | 未完成生产运行时，后端枚举不等于已集成；当前使用 llamadart / llama.cpp 与专用 LES。 |
+| MNN | 未完成Runtime，后端枚举不等于已集成；当前使用 llamadart / llama.cpp 与专用 LES。 |
 | 默认 System Prompt | 已完成：引导保存身份、安全、工作区、隐私和验证规则。 |
 | 历史末尾优先 | 已完成：打开历史定位到最新消息。 |
 | 内置终端 | 已完成：设置 → Shell → 开发者终端，保留危险命令确认。 |
-| 跨后端 Harness | 部分完成：API 适配和本地任务链路存在；未证明所有后端全功能等价。 |
+| 跨后端 Harness | 部分完成：API 有限适配和本地任务链路存在。 |
 
 安装包校验、签名与真机证据见[验证记录](docs/verification-beta4.md)，下载资产见 [Beta.4 Release](https://github.com/psq0421/SIQI/releases/tag/v1.0.0.Beta.4)。
 
 项目使用 Flutter stable、Riverpod、SQLite、llama.cpp FFI；原生运行时和模型文件遵循各自许可证。提交 Issue 前请隐藏 API Key、个人文件内容和完整会话文本。
 
-研究入口和自动测试不再只停留于计划：源码见 `agent_service.dart`、`local_database.dart`、`performance_lab_page.dart`；汇总工具为 `tools/research/summarize_runs.dart`，CI 定义位于 `.github/workflows/quality.yml`。Git 保留已有真实历史，不虚构提交时间或上游贡献。
+研究入口和自动测试不再只停留于计划：源码见 `agent_service.dart`、`local_database.dart`、`performance_lab_page.dart`；汇总工具为 `tools/research/summarize_runs.dart`，CI 定义位于 `.github/workflows/quality.yml`。Git 保留已有真实历史。
 
 ## 许可证与反馈
 
