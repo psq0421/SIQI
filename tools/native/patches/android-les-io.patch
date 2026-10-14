@@ -1,0 +1,289 @@
+diff --git a/src/llama-moe-slot.cpp b/src/llama-moe-slot.cpp
+index 28c7666..d70b7ff 100644
+--- a/src/llama-moe-slot.cpp
++++ b/src/llama-moe-slot.cpp
+@@ -32,6 +32,9 @@
+ #include <fcntl.h>
+ #include <sys/uio.h>
+ #include <unistd.h>
++#ifdef __ANDROID__
++#include <sched.h>
++#endif
+ #endif
+ 
+ namespace {
+@@ -94,6 +97,97 @@ static bool park_window_enabled() {
+ 
+ using metal_buf_fn = bool (*)(ggml_backend_buffer_t);
+ 
++// SIQI Android experiment: keep I/O workers alive across the 40 layer waves.
++// A bounded synchronous barrier preserves the original expert-install order;
++// the workers perform preadv off the compute thread, without creating hundreds
++// of pthreads for every decoded token. Prefetch uses a separate pool.
++class moe_io_pool {
++public:
++    explicit moe_io_pool(int count) {
++        if (count <= 1) return;
++        workers.reserve((size_t) count);
++        try {
++            for (int i = 0; i < count; ++i) workers.emplace_back([this] { work(); });
++        } catch (...) {
++            { std::lock_guard<std::mutex> guard(lock); stopping = true; }
++            wake.notify_all();
++            for (auto & thread : workers) thread.join();
++            throw;
++        }
++    }
++    ~moe_io_pool() {
++        { std::lock_guard<std::mutex> guard(lock); stopping = true; }
++        wake.notify_all();
++        for (auto & thread : workers) thread.join();
++    }
++    void run(int count, const std::function<void(int)> & action) {
++        if (count <= 0) return;
++        if (workers.empty() || count == 1) {
++            for (int i = 0; i < count; ++i) action(i);
++            return;
++        }
++        std::unique_lock<std::mutex> guard(lock);
++        callback = action;
++        failure = nullptr;
++        tasks = count;
++        next.store(0, std::memory_order_relaxed);
++        outstanding = (int) workers.size();
++        ++generation;
++        wake.notify_all();
++        completed.wait(guard, [this] { return outstanding == 0; });
++        callback = {};
++        if (failure) std::rethrow_exception(failure);
++    }
++private:
++    void work() {
++#ifdef __ANDROID__
++        // Optional per-worker affinity, independent of compute affinity.
++        // The kernel's cpuset/thermal policy remains authoritative.
++        if (const char * setting = std::getenv("SIQI_MOE_IO_CPU_MASK")) {
++            const unsigned long long mask = std::strtoull(setting, nullptr, 0);
++            cpu_set_t cores; CPU_ZERO(&cores);
++            for (int i = 0; i < CPU_SETSIZE && i < 64; ++i) if (mask & (1ULL << i)) CPU_SET(i, &cores);
++            if (mask) sched_setaffinity(0, sizeof(cores), &cores);
++        }
++#endif
++        uint64_t observed = 0;
++        for (;;) {
++            std::unique_lock<std::mutex> guard(lock);
++            wake.wait(guard, [this, observed] { return stopping || generation != observed; });
++            if (stopping) return;
++            observed = generation;
++            const int count = tasks;
++            const auto action = callback;
++            guard.unlock();
++            for (;;) {
++                const int index = next.fetch_add(1, std::memory_order_relaxed);
++                if (index >= count) break;
++                try { action(index); }
++                catch (...) {
++                    std::lock_guard<std::mutex> error_guard(lock);
++                    if (!failure) failure = std::current_exception();
++                }
++            }
++            guard.lock();
++            if (--outstanding == 0) completed.notify_one();
++        }
++    }
++    std::mutex lock;
++    std::condition_variable wake, completed;
++    std::vector<std::thread> workers;
++    std::function<void(int)> callback;
++    std::exception_ptr failure;
++    std::atomic<int> next{0};
++    int tasks = 0, outstanding = 0;
++    uint64_t generation = 0;
++    bool stopping = false;
++};
++
++static bool persistent_io_enabled() {
++    const char * setting = std::getenv("SIQI_MOE_PERSISTENT_IO");
++    return !setting || setting[0] != '0';
++}
++
+ static metal_buf_fn lookup_metal_buf_fn(ggml_backend_buffer_t buf, const char * name) {
+     if (!buf) {
+         return nullptr;
+@@ -833,6 +927,15 @@ struct llama_moe_slot_runtime::impl {
+         const int32_t from = cache_only ? lo
+                                         : (prefetch_unified ? lo : st.window_start + c_il);
+ 
++        // A layer can be reconfigured while a lookahead request is draining
++        // (for example after a parked window is reattached).  Treat an
++        // out-of-range window as a dropped prefetch instead of indexing past
++        // the slot vectors from the worker thread.
++        if (from < 0 || hi < from || hi > (int32_t) st.slot_to_expert.size() ||
++            st.expert_to_slot.size() != (size_t) n_expert) {
++            return -1;
++        }
++
+         int32_t slot = -1;
+         for (int32_t cand = from; cand < hi; ++cand) {
+             if (st.slot_to_expert[(size_t) cand] == kSlotFree) {
+@@ -856,7 +959,7 @@ struct llama_moe_slot_runtime::impl {
+             return -1;
+         }
+         const int32_t evicted = st.slot_to_expert[(size_t) slot];
+-        if (evicted >= 0) {
++        if (evicted >= 0 && evicted < n_expert) {
+             st.expert_to_slot[(size_t) evicted] = kSlotFree;
+         }
+         st.slot_to_expert[(size_t) slot] = kSlotPending;   // 认领，内容尚未写入
+@@ -866,6 +969,11 @@ struct llama_moe_slot_runtime::impl {
+     /// 读完后登记为有效缓存条目。**调用方必须已持 st.mutex**。
+     /// 返回是否真的登记（专家在读盘期间被主路径抢先装好时不登记，丢弃这份）。
+     bool publish_slot_in_window(layer_state & st, int32_t expert, int32_t slot) {
++        if (expert < 0 || expert >= n_expert || slot < 0 ||
++            slot >= (int32_t) st.slot_to_expert.size() ||
++            st.expert_to_slot.size() != (size_t) n_expert) {
++            return false;
++        }
+         // 读盘期间主路径可能已经把同一个专家装好了（它自己读的），那就丢弃这份。
+         if (st.expert_to_slot[(size_t) expert] >= 0) {
+             st.slot_to_expert[(size_t) slot] = kSlotFree;
+@@ -1330,10 +1438,17 @@ struct llama_moe_slot_runtime::impl {
+     static int nocache_mode() {
+         static const int m = [] {
+             const char * e = std::getenv("LLAMA_MOE_F_NOCACHE");
++#if !defined(__APPLE__)
++            if (e && *e && std::strcmp(e, "0") != 0) {
++                moe_log("F_NOCACHE is unavailable on this platform; experts use the page cache");
++            }
++            return 0;
++#else
+             if (!e || !*e || std::strcmp(e, "0") == 0) {
+                 return 0;
+             }
+             return std::strcmp(e, "auto") == 0 ? -1 : 1;
++#endif
+         }();
+         return m;
+     }
+@@ -1345,7 +1460,7 @@ struct llama_moe_slot_runtime::impl {
+ 
+     /// 把已打开的 experts fd 的 F_NOCACHE 拨到 `on`。只改缓存行为，不动数据。
+     void apply_experts_nocache(bool on) {
+-#ifndef _WIN32
++#if defined(__APPLE__)
+         std::lock_guard<std::mutex> lock(fd_mutex);
+         for (const auto & kv : fds) {
+             if (fcntl(kv.second, F_NOCACHE, on ? 1 : 0) != 0) {
+@@ -1372,9 +1487,11 @@ struct llama_moe_slot_runtime::impl {
+         const int fd = _open(path.c_str(), _O_RDONLY | _O_BINARY);
+ #else
+         const int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
++#if defined(__APPLE__)
+         if (experts_nocache_desired() && fcntl(fd, F_NOCACHE, 1) != 0) {
+             moe_log("F_NOCACHE 设置失败: %s", std::strerror(errno));
+         }
++#endif
+ #endif
+         if (fd < 0) {
+             throw std::runtime_error(format("failed to open MoE experts file '%s': %s", path.c_str(), std::strerror(errno)));
+@@ -1519,7 +1636,37 @@ struct llama_moe_slot_runtime::impl {
+         }
+ 
+         const int64_t t0 = now_ns();
+-        readv_span(fd, offset, iov, n);
++        bool mapped = false;
++#ifdef __ANDROID__
++        // Opt-in file-backed slot experiment; validate ALL families first.
++        // Unaligned models retain the preadv path. The registered CPU function
++        // verifies ownership/range before allowing any MAP_FIXED operation.
++        const char * use_mapping = std::getenv("SIQI_MOE_MMAP_SLOTS");
++        if (mode == 0 && use_mapping && use_mapping[0] == '1') {
++            using map_fn = bool (*)(ggml_backend_buffer_t, void *, size_t, int, uint64_t, bool);
++            auto cpu = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++            auto reg = ggml_backend_dev_backend_reg(cpu);
++            auto map = (map_fn) ggml_backend_reg_get_proc_address(reg, "siqi_expert_map_readonly");
++            size_t family_offset = offset;
++            mapped = map != nullptr;
++            for (int i = 0; mapped && i < n; ++i) {
++                mapped = map(bindings[order[(size_t) i]].tensor->buffer,
++                    iov[i].iov_base, iov[i].iov_len, fd, family_offset, true);
++                family_offset += iov[i].iov_len;
++            }
++            if (mapped) {
++                family_offset = offset;
++                for (int i = 0; i < n; ++i) {
++                    if (!map(bindings[order[(size_t) i]].tensor->buffer,
++                            iov[i].iov_base, iov[i].iov_len, fd, family_offset, false)) {
++                        throw std::runtime_error("expert-slot-map-validation-changed");
++                    }
++                    family_offset += iov[i].iov_len;
++                }
++            }
++        }
++#endif
++        if (!mapped) readv_span(fd, offset, iov, n);
+         const int64_t dt = now_ns() - t0;
+         stats.pread_ns.fetch_add(dt, std::memory_order_relaxed);
+         stats.n_bytes.fetch_add(nbytes, std::memory_order_relaxed);
+@@ -1698,22 +1845,23 @@ struct llama_moe_slot_runtime::impl {
+                 read_one(i);
+             }
+         } else {
+-            std::atomic<int> next{0};
+-            std::vector<std::thread> threads;
+-            threads.reserve((size_t) t.n_th);
+-            for (int th = 0; th < t.n_th; ++th) {
+-                threads.emplace_back([&]() {
+-                    for (;;) {
+-                        const int i = next.fetch_add(1, std::memory_order_relaxed);
+-                        if (i >= n) {
+-                            break;
++            if (persistent_io_enabled()) {
++                foreground_io.run(n, read_one);
++            } else {
++                // Keep the old implementation as an exact A/B control.
++                std::atomic<int> next{0};
++                std::vector<std::thread> threads;
++                threads.reserve((size_t) t.n_th);
++                for (int th = 0; th < t.n_th; ++th) {
++                    threads.emplace_back([&]() {
++                        for (;;) {
++                            const int i = next.fetch_add(1, std::memory_order_relaxed);
++                            if (i >= n) break;
++                            read_one(i);
+                         }
+-                        read_one(i);
+-                    }
+-                });
+-            }
+-            for (auto & th : threads) {
+-                th.join();
++                    });
++                }
++                for (auto & th : threads) th.join();
+             }
+         }
+         t.wall_ns = now_ns() - wall0;
+@@ -1939,6 +2087,7 @@ struct llama_moe_slot_runtime::impl {
+     std::mutex io_mutex;
+     io_stats stats;
+     lookahead_expert_prefetch lookahead;
++    moe_io_pool foreground_io{persistent_io_enabled() ? moe_ssd_io_threads() : 1};
+     ggml_tensor * lookahead_pending = nullptr;
+ 
+     std::atomic<bool> parked{false};
+@@ -2534,6 +2683,14 @@ void llama_moe_slot_runtime::process(
+                     if (resident == kSlotPending) {
+                         continue;
+                     }
++                    // A slot can be free while the window is being rebuilt or
++                    // after a parked expert bank is reattached.  Never use the
++                    // sentinel kSlotFree (-1) as an expert index: on Android
++                    // this otherwise becomes a hard SIGSEGV in long decode
++                    // runs with lookahead enabled.
++                    if (resident < 0 || resident >= pimpl->n_expert) {
++                        continue;
++                    }
+                     if (pass == 0 && !keep.empty() && keep[(size_t) resident]) {
+                         continue;   // 预测下一步要用，先不动它
+                     }

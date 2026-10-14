@@ -80,10 +80,13 @@ Available variables: {user_name}, {current_time}.
     this.fontScale = 1,
     this.messageSpacing = 10,
     this.timestampStyle = TimestampStyle.relative,
-    this.contextWindow = 32768,
+    // A new installation starts at the 64K product target.  The inference
+    // planner may lower the effective local window when the selected model or
+    // device cannot safely reserve the required KV cache.
+    this.contextWindow = 65536,
     this.temperature = 0.7,
     this.topP = 0.9,
-    this.maxTokens = 4096,
+    this.maxTokens = 65536,
     this.reasoningEffort = ReasoningEffort.medium,
     this.systemPrompt = defaultSystemPrompt,
     this.saveInterval = SaveInterval.realtime,
@@ -103,6 +106,7 @@ Available variables: {user_name}, {current_time}.
     this.developerMode = false,
     this.generatedProjectsPath = '/storage/emulated/0/Siqi/Projects',
     this.selectedCpuCores = const [],
+    this.keepScreenAwake = true,
   });
 
   final bool onboardingComplete;
@@ -136,6 +140,7 @@ Available variables: {user_name}, {current_time}.
   final bool developerMode;
   final String generatedProjectsPath;
   final List<int> selectedCpuCores;
+  final bool keepScreenAwake;
 
   AppSettings copyWith({
     bool? onboardingComplete,
@@ -172,6 +177,7 @@ Available variables: {user_name}, {current_time}.
     bool? developerMode,
     String? generatedProjectsPath,
     List<int>? selectedCpuCores,
+    bool? keepScreenAwake,
   }) => AppSettings(
     onboardingComplete: onboardingComplete ?? this.onboardingComplete,
     userName: userName ?? this.userName,
@@ -211,6 +217,7 @@ Available variables: {user_name}, {current_time}.
     developerMode: developerMode ?? this.developerMode,
     generatedProjectsPath: generatedProjectsPath ?? this.generatedProjectsPath,
     selectedCpuCores: selectedCpuCores ?? this.selectedCpuCores,
+    keepScreenAwake: keepScreenAwake ?? this.keepScreenAwake,
   );
 
   Map<String, Object?> toJson() => {
@@ -245,6 +252,7 @@ Available variables: {user_name}, {current_time}.
     'developerMode': developerMode,
     'generatedProjectsPath': generatedProjectsPath,
     'selectedCpuCores': selectedCpuCores,
+    'keepScreenAwake': keepScreenAwake,
   };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) => AppSettings(
@@ -263,12 +271,12 @@ Available variables: {user_name}, {current_time}.
     // Beta3 caps the user-facing context at 128K. Older installations may
     // Older installations may have a value above the new product cap;
     // migrate it safely instead of attempting an oversized KV allocation.
-    contextWindow: ((json['contextWindow'] as num?)?.toInt() ?? 32768)
+    contextWindow: ((json['contextWindow'] as num?)?.toInt() ?? 65536)
         .clamp(2048, 131072)
         .toInt(),
     temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
     topP: (json['topP'] as num?)?.toDouble() ?? 0.9,
-    maxTokens: json['maxTokens'] as int? ?? 4096,
+    maxTokens: json['maxTokens'] as int? ?? 65536,
     reasoningEffort: ReasoningEffort.values.byName(
       json['reasoningEffort'] as String? ?? 'medium',
     ),
@@ -303,6 +311,7 @@ Available variables: {user_name}, {current_time}.
         .map((value) => value.toInt())
         .where((value) => value >= 0 && value < 63)
         .toList(),
+    keepScreenAwake: json['keepScreenAwake'] as bool? ?? true,
   );
 }
 
@@ -344,6 +353,8 @@ class ModelDefinition {
     this.downloadUrl,
     this.sourceUrl,
     this.expectedSha256,
+    this.memoryBudgetBytes,
+    this.runtimeProfile = 'default',
     this.isDeviceCompatible = true,
     this.task = ModelTask.chat,
     this.runtime = ModelRuntime.llamaCpp,
@@ -372,6 +383,8 @@ class ModelDefinition {
        minimumMemoryGb = null,
        downloadUrl = null,
        expectedSha256 = null,
+       memoryBudgetBytes = null,
+       runtimeProfile = 'default',
        isDeviceCompatible = false,
        runtime = ModelRuntime.external,
        format = ModelFormat.bundle,
@@ -391,6 +404,17 @@ class ModelDefinition {
   final String? downloadUrl;
   final String? sourceUrl;
   final String? expectedSha256;
+
+  /// Hard resident-memory target for a model profile, in bytes. This is a
+  /// scheduling/admission budget, not a claim that an arbitrary runtime can
+  /// execute the model within that amount. The acceptance harness measures
+  /// the actual process RSS/PSS separately.
+  final int? memoryBudgetBytes;
+
+  /// Stable runtime profile selected by the catalog. Keeping this as data
+  /// lets C++, Rust, MNN, ONNX and other native backends share the same
+  /// admission policy without putting engine-specific checks in the UI.
+  final String runtimeProfile;
   final bool isDeviceCompatible;
   final ModelTask task;
   final ModelRuntime runtime;

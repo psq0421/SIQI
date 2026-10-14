@@ -256,7 +256,10 @@ class LocalGatewayService {
             .every((a) => artifacts.containsKey(a.id))) {
           throw const FormatException('model-not-installed');
         }
-        final maxTokens = _number(body, 'max_tokens', 512, 1, 8192).toInt();
+        // Accept the same product envelope as the in-app settings.  The
+        // local resource planner still computes a smaller effective value
+        // when the model/device cannot safely reserve the KV cache.
+        final maxTokens = _number(body, 'max_tokens', 65536, 1, 262144).toInt();
         final temperature = _number(body, 'temperature', .7, 0, 2).toDouble();
         final topP = _number(body, 'top_p', .9, .01, 1).toDouble();
         streamed = body['stream'] == true;
@@ -277,7 +280,7 @@ class LocalGatewayService {
           contextWindow: _number(
             body,
             'context_window',
-            2048,
+            65536,
             2048,
             131072,
           ).toInt(),

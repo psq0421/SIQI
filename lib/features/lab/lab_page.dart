@@ -99,7 +99,7 @@ class LabPage extends ConsumerWidget {
                                 Text(
                                   context.l10n.deepSeekHarnessTitle,
                                   style: Theme.of(context).textTheme.titleLarge
-                                      ?.copyWith(fontWeight: FontWeight.w800),
+                                      ?.copyWith(fontWeight: FontWeight.w500),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(context.l10n.harnessDescription),

@@ -1,0 +1,42 @@
+diff --git a/src/llama-moe-slot.cpp b/src/llama-moe-slot.cpp
+--- a/src/llama-moe-slot.cpp
++++ b/src/llama-moe-slot.cpp
+@@ -1330,10 +1330,17 @@ struct llama_moe_slot_runtime::impl {
+     static int nocache_mode() {
+         static const int m = [] {
+             const char * e = std::getenv("LLAMA_MOE_F_NOCACHE");
++#if !defined(__APPLE__)
++            if (e && *e && std::strcmp(e, "0") != 0) {
++                moe_log("F_NOCACHE is unavailable on this platform; experts use the page cache");
++            }
++            return 0;
++#else
+             if (!e || !*e || std::strcmp(e, "0") == 0) {
+                 return 0;
+             }
+             return std::strcmp(e, "auto") == 0 ? -1 : 1;
++#endif
+         }();
+         return m;
+     }
+@@ -1345,7 +1352,7 @@ struct llama_moe_slot_runtime::impl {
+ 
+     /// 把已打开的 experts fd 的 F_NOCACHE 拨到 `on`。只改缓存行为，不动数据。
+     void apply_experts_nocache(bool on) {
+-#ifndef _WIN32
++#if defined(__APPLE__)
+         std::lock_guard<std::mutex> lock(fd_mutex);
+         for (const auto & kv : fds) {
+             if (fcntl(kv.second, F_NOCACHE, on ? 1 : 0) != 0) {
+@@ -1372,9 +1379,11 @@ struct llama_moe_slot_runtime::impl {
+         const int fd = _open(path.c_str(), _O_RDONLY | _O_BINARY);
+ #else
+         const int fd = open(path.c_str(), O_RDONLY | O_CLOEXEC);
++#if defined(__APPLE__)
+         if (experts_nocache_desired() && fcntl(fd, F_NOCACHE, 1) != 0) {
+             moe_log("F_NOCACHE 设置失败: %s", std::strerror(errno));
+         }
++#endif
+ #endif
+         if (fd < 0) {
+             throw std::runtime_error(format("failed to open MoE experts file '%s': %s", path.c_str(), std::strerror(errno)));

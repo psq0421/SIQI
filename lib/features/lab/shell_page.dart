@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/icons/siqi_icons.dart';
@@ -72,7 +74,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
     final settings = ref.watch(settingsProvider);
     if (!settings.developerMode) {
       return Scaffold(
-        appBar: AppBar(title: Text(context.l10n.shellTitle)),
+        appBar: SiqiPageBar(title: Text(context.l10n.shellTitle)),
         body: SiqiEmptyState(
           title: context.l10n.developerModeRequired,
           body: context.l10n.developerModeRequiredDescription,
@@ -88,7 +90,7 @@ class _ShellPageState extends ConsumerState<ShellPage> {
         )
         .length;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.shellTitle)),
+      appBar: SiqiPageBar(title: Text(context.l10n.shellTitle)),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

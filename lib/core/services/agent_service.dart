@@ -8,6 +8,7 @@ import '../database/local_database.dart';
 import '../models/app_models.dart';
 import '../models/workbench_models.dart';
 import 'shell_service.dart';
+import 'trace_redactor.dart';
 import 'workspace_service.dart';
 
 class AgentService {
@@ -18,6 +19,68 @@ class AgentService {
   String? _lastExecutionId;
 
   String? get lastExecutionId => _lastExecutionId;
+
+  Future<String> beginTask({
+    required String workspacePath,
+    required String instruction,
+    required String modelId,
+    required String sessionId,
+  }) async {
+    final id = const Uuid().v4();
+    await _database.startAgentExecution(
+      id: id,
+      workspacePath: workspacePath,
+      summary: 'Agent request',
+      inputInstruction: _redact(instruction),
+      sessionId: sessionId,
+    );
+    await _database.appendAgentEvent(
+      executionId: id,
+      eventType: 'model_requested',
+      payload: {'modelId': modelId, 'inputInstruction': _redact(instruction)},
+    );
+    return id;
+  }
+
+  Future<void> recordPlan(String id, AgentEnvelope? envelope) async {
+    await _database.appendAgentEvent(
+      executionId: id,
+      eventType: 'model_completed',
+      payload: {
+        'summary': envelope == null ? null : _redact(envelope.summary),
+        'plan': [
+          for (final step in envelope?.steps ?? <AgentStep>[])
+            {
+              'id': step.id,
+              'title': _redact(step.title),
+              'description': _redact(step.description),
+            },
+        ],
+        'actions': [
+          for (final action in envelope?.actions ?? <AgentAction>[])
+            {'id': action.id, ..._actionPayload(action)},
+        ],
+      },
+    );
+    if (envelope == null || envelope.actions.isEmpty) {
+      await finishTask(id, 'completed', 'no_tool_actions');
+    } else {
+      await _database.setAgentExecutionStatus(id, 'awaiting_approval');
+    }
+  }
+
+  Future<void> finishTask(String id, String status, String reason) async {
+    await _database.appendAgentEvent(
+      executionId: id,
+      eventType: 'task_$status',
+      payload: {'terminationReason': _redact(reason)},
+    );
+    await _database.completeAgentExecution(
+      id,
+      status,
+      terminationReason: _redact(reason),
+    );
+  }
 
   List<AgentStep> createLocalPlan(String task) {
     final normalized = task.toLowerCase();
@@ -80,25 +143,61 @@ Paths must be relative to the workspace. Never request deletion, privilege escal
     required List<AgentAction> actions,
     required ShellEnvironment shellEnvironment,
     required bool allowMutations,
+    String inputInstruction = '',
+    String? traceId,
   }) async {
     final results = <AgentActionResult>[];
-    final executionId = const Uuid().v4();
+    final executionId = traceId ?? const Uuid().v4();
     _lastExecutionId = executionId;
     final snapshottedPaths = <String>{};
-    await _database.startAgentExecution(
-      id: executionId,
-      workspacePath: workspacePath,
-      summary: '${actions.length} approved actions',
+    if (traceId != null) {
+      final trace = await _database.agentExecution(traceId);
+      if (trace == null || trace['workspace_path'] != workspacePath) {
+        await finishTask(
+          executionId,
+          'failed',
+          'workspace_changed_before_approval',
+        );
+        throw StateError('Agent workspace changed before approval');
+      }
+    }
+    if (traceId == null) {
+      await _database.startAgentExecution(
+        id: executionId,
+        workspacePath: workspacePath,
+        summary: '${actions.length} approved actions',
+        inputInstruction: _redact(inputInstruction),
+      );
+    }
+    await _database.setAgentExecutionStatus(executionId, 'running');
+    await _database.appendAgentEvent(
+      executionId: executionId,
+      eventType: 'task_started',
+      payload: {
+        'inputInstruction': _redact(inputInstruction),
+        'actionCount': actions.length,
+        'allowMutations': allowMutations,
+      },
     );
+    Object? executionError;
     try {
       for (final action in actions) {
+        await _database.appendAgentEvent(
+          executionId: executionId,
+          eventType: 'action_started',
+          actionId: action.id,
+          payload: _actionPayload(action),
+        );
         if (action.mutatesWorkspace && !allowMutations) {
+          const output = 'Mutation approval required';
           results.add(
-            AgentActionResult(
-              action: action,
-              success: false,
-              output: 'Mutation approval required',
-            ),
+            AgentActionResult(action: action, success: false, output: output),
+          );
+          await _database.appendAgentEvent(
+            executionId: executionId,
+            eventType: 'action_failed',
+            actionId: action.id,
+            payload: {'error': output, 'reason': 'approval_required'},
           );
           continue;
         }
@@ -175,24 +274,83 @@ Paths must be relative to the workspace. Never request deletion, privilege escal
                 ),
               );
           }
+          final result = results.last;
+          await _database.appendAgentEvent(
+            executionId: executionId,
+            eventType: result.success ? 'action_completed' : 'action_failed',
+            actionId: action.id,
+            payload: {
+              'success': result.success,
+              'exitCode': result.exitCode,
+              'output': _redact(_bounded(result.output)),
+            },
+          );
         } on Object catch (error) {
+          final detail = _redact(error.toString());
           results.add(
-            AgentActionResult(
-              action: action,
-              success: false,
-              output: error.toString(),
-            ),
+            AgentActionResult(action: action, success: false, output: detail),
+          );
+          await _database.appendAgentEvent(
+            executionId: executionId,
+            eventType: 'action_failed',
+            actionId: action.id,
+            payload: {'error': detail},
           );
         }
       }
+    } on Object catch (error) {
+      executionError = error;
+      rethrow;
     } finally {
+      final success =
+          executionError == null &&
+          results.length == actions.length &&
+          results.every((result) => result.success);
+      final reason = results.isEmpty
+          ? 'no_actions'
+          : success
+          ? 'completed'
+          : executionError == null
+          ? 'action_failed'
+          : 'execution_error';
+      await _database.appendAgentEvent(
+        executionId: executionId,
+        eventType: success ? 'task_completed' : 'task_failed',
+        payload: {
+          'terminationReason': reason,
+          'successfulActions': results.where((result) => result.success).length,
+          'failedActions': results.where((result) => !result.success).length,
+          if (executionError != null)
+            'error': _redact(executionError.toString()),
+        },
+      );
       await _database.completeAgentExecution(
         executionId,
-        results.every((result) => result.success) ? 'completed' : 'failed',
+        success ? 'completed' : 'failed',
+        terminationReason: reason,
       );
     }
     return results;
   }
+
+  Map<String, Object?> _actionPayload(AgentAction action) => {
+    'type': action.type.name,
+    'path': _redact(action.path),
+    'command': action.command == null ? null : _redact(action.command!),
+    'reason': _redact(action.reason),
+    'contentSha256': action.content == null
+        ? null
+        : sha256.convert(utf8.encode(action.content!)).toString(),
+    'contentBytes': action.content == null
+        ? 0
+        : utf8.encode(action.content!).length,
+  };
+
+  String _bounded(String value) => value.length <= 12000
+      ? value
+      : '${value.substring(0, 12000)}\n...[truncated]';
+
+  String _redact(String value) => TraceRedactor.sanitize(value);
 
   Future<void> _snapshotPath({
     required String executionId,

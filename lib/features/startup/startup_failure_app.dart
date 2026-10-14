@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -23,7 +25,7 @@ class StartupFailureApp extends StatelessWidget {
     darkTheme: ThemeData(useMaterial3: true, brightness: Brightness.dark),
     home: Builder(
       builder: (context) => Scaffold(
-        appBar: AppBar(title: Text(context.l10n.appName)),
+        appBar: SiqiPageBar(title: Text(context.l10n.appName)),
         body: ListView(
           padding: const EdgeInsets.all(24),
           children: [

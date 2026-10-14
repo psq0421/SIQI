@@ -1,0 +1,5 @@
+{"event":"started","runId":"synthetic-ok"}
+{"event":"completed","runId":"synthetic-ok","modelId":"synthetic-model","profile":"synthetic-cpu","device":{"socModel":"synthetic-device"},"error":null,"performance":{"decodeTokensPerSecond":4.5},"memoryAcceptance":{"verdict":"passed"}}
+{"event":"started","runId":"synthetic-unfinished"}
+{"event":"completed","runId":"synthetic-failure","modelId":"synthetic-model","profile":"synthetic-cpu","device":{"socModel":"synthetic-device"},"error":"synthetic-timeout","performance":null,"memoryAcceptance":{"verdict":"inconclusive"}}
+deliberately-malformed-synthetic-fixture

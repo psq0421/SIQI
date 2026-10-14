@@ -98,9 +98,9 @@ class SettingsPage extends StatelessWidget {
         ),
         Expanded(
           child: ListView.separated(
-            padding: const EdgeInsets.fromLTRB(12, 4, 12, 28),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
             itemCount: items.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            separatorBuilder: (_, __) => const SizedBox(height: 14),
             itemBuilder: (context, index) {
               final item = items[index];
               return SiqiActionTile(

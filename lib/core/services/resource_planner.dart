@@ -33,6 +33,8 @@ class InferenceResourcePlan {
     this.cacheType = 'q8_0',
     this.flashAttention = true,
     this.swapAssisted = false,
+    this.memoryBudgetBytes,
+    this.runtimeProfile = 'default',
     this.reasonCode,
   });
 
@@ -53,6 +55,13 @@ class InferenceResourcePlan {
   final String cacheType;
   final bool flashAttention;
   final bool swapAssisted;
+
+  /// Resident-memory acceptance target supplied by the model catalog, not a
+  /// native allocator cap. It is
+  /// intentionally exposed in the plan so every backend (C++, Rust, MNN,
+  /// ONNX, etc.) can apply the same budget and the benchmark can report it.
+  final int? memoryBudgetBytes;
+  final String runtimeProfile;
   final String? reasonCode;
 }
 
@@ -112,7 +121,18 @@ abstract final class ResourcePlanner {
     final swapCredit = runtime.swapFreeBytes > 0
         ? (runtime.swapFreeBytes * (pressure == 'normal' ? .20 : .35)).round()
         : 0;
-    final usable = math.max(0, memory.availableBytes - reserve) + swapCredit;
+    final platformUsable =
+        math.max(0, memory.availableBytes - reserve) + swapCredit;
+    final isMiniCpmV47Large = model.runtimeProfile == 'minicpm-v47-35b-les';
+    // The 35B-A3B profile is intentionally conservative: the official
+    // iPhone-sized figures rely on LES/expert streaming, which the current
+    // bundled llama.cpp runtime does not provide yet. Keep 5 GB as a hard
+    // admission target for all future backends instead of silently allowing
+    // a large mmap/repack to consume the whole phone.
+    final profileBudget = model.memoryBudgetBytes;
+    final usable = profileBudget == null
+        ? platformUsable
+        : math.min(platformUsable, math.max(0, profileBudget - 256 * _mib));
     final projectorWorkingSet = withMultimodalProjector
         ? (model.projectorArtifact?.sizeBytes ?? 384 * _mib) + 256 * _mib
         : 0;
@@ -123,8 +143,14 @@ abstract final class ResourcePlanner {
     // pages can grow beyond it during generation; benchmark pressure is
     // recorded separately. Dense models must not be assumed to have a tiny
     // MoE active set.
+    final residentCap = isMiniCpmV47Large
+        ? math.min(
+            2750 * _mib,
+            math.max(0, usable - projectorWorkingSet - 256 * _mib),
+          )
+        : 1024 * _mib;
     final mappedResident = largeMapped
-        ? math.min(modelBytes, 1024 * _mib)
+        ? math.min(modelBytes, residentCap)
         : modelBytes;
     final baseWorkingSet = mappedResident + projectorWorkingSet + 256 * _mib;
     final headroom = usable - baseWorkingSet;
@@ -135,25 +161,20 @@ abstract final class ResourcePlanner {
       _ => 32 * 1024,
     };
     final contextByMemory = math.max(0, headroom ~/ kvBytesPerToken);
-    const contextOptions = <int>[
-      2048,
-      4096,
-      8192,
-      16384,
-      32768,
-      65536,
-      131072,
-    ];
+    const contextOptions = <int>[2048, 4096, 8192, 16384, 32768, 65536, 131072];
     final contextCap = contextOptions.lastWhere(
       (value) => value <= contextByMemory,
       orElse: () => 2048,
     );
     final context = requestedContext
-        .clamp(2048, largeMapped ? math.min(contextCap, 2048) : contextCap)
+        .clamp(
+          2048,
+          isMiniCpmV47Large
+              ? math.min(contextCap, 2048)
+              : (largeMapped ? math.min(contextCap, 2048) : contextCap),
+        )
         .toInt();
-    final output = requestedOutput
-        .clamp(1, math.max(1, context ~/ 2))
-        .toInt();
+    final output = requestedOutput.clamp(1, math.max(1, context ~/ 2)).toInt();
     final kvEstimate = context * kvBytesPerToken;
     final peak = baseWorkingSet + kvEstimate;
     final allowed =
@@ -169,8 +190,16 @@ abstract final class ResourcePlanner {
     // Vulkan often duplicates/offloads weights rather than paging them.
     // Never try full GPU allocation for a GGUF larger than free physical RAM.
     final gpu = largeMapped || pressure == 'critical' ? 0 : 999;
-    final batch = pressure == 'normal' ? 512 : 256;
-    final microBatch = pressure == 'normal' ? 256 : 128;
+    final batch = isMiniCpmV47Large
+        ? 64
+        : pressure == 'normal'
+        ? 512
+        : 256;
+    final microBatch = isMiniCpmV47Large
+        ? 32
+        : pressure == 'normal'
+        ? 256
+        : 128;
     return InferenceResourcePlan(
       allowed: allowed,
       contextWindow: context,
@@ -183,9 +212,13 @@ abstract final class ResourcePlanner {
       gpuLayers: gpu,
       batchSize: batch,
       microBatchSize: microBatch,
-      cacheType: pressure == 'critical' ? 'q4_0' : 'q8_0',
+      // A quantized KV cache is mandatory for the 5 GB profile; q8_0 is
+      // needlessly expensive for a streamed MoE model.
+      cacheType: isMiniCpmV47Large || pressure == 'critical' ? 'q4_0' : 'q8_0',
       flashAttention: true,
       swapAssisted: runtime.swapFreeBytes > 0 && mappedResident < modelBytes,
+      memoryBudgetBytes: profileBudget,
+      runtimeProfile: model.runtimeProfile,
       reasonCode: allowed ? null : 'insufficient-memory',
     );
   }

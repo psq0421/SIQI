@@ -1,0 +1,53 @@
+diff --git a/ggml/src/ggml-vulkan/ggml-vulkan.cpp b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+index c9f906d..c93f575 100644
+--- a/ggml/src/ggml-vulkan/ggml-vulkan.cpp
++++ b/ggml/src/ggml-vulkan/ggml-vulkan.cpp
+@@ -2331,6 +2331,13 @@ static bool ggml_vk_strip_decode_vector(const uint32_t * code, size_t word_count
+ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipeline, size_t spv_size, const void* spv_data, const std::string entrypoint,
+                                          uint32_t parameter_count, std::array<uint32_t, 3> wg_denoms, std::vector<uint32_t> specialization_constants,
+                                          bool disable_robustness, bool require_full_subgroups, uint32_t required_subgroup_size) {
++    // Release the compile admission slot on both success and driver failure.
++    struct compile_admission_guard {
++        ~compile_admission_guard() {
++            { std::lock_guard<std::mutex> lock(compile_count_mutex); assert(compile_count > 0); --compile_count; }
++            compile_count_cond.notify_all();
++        }
++    } admission;
+     VK_LOG_DEBUG("ggml_vk_create_pipeline(" << device->name << ", " << pipeline->name << ", " << entrypoint << ", " << parameter_count <<
+                  ", (" << wg_denoms[0] << "," << wg_denoms[1] << "," << wg_denoms[2] << "), specialization_constants, " <<
+                  disable_robustness << ", " << require_full_subgroups << ", " << required_subgroup_size << ")");
+@@ -2543,12 +2550,6 @@ static void ggml_vk_create_pipeline_func(vk_device& device, vk_pipeline& pipelin
+ 
+     device->all_pipelines.push_back(pipeline);
+ 
+-    {
+-        std::lock_guard<std::mutex> guard(compile_count_mutex);
+-        assert(compile_count > 0);
+-        compile_count--;
+-    }
+-    compile_count_cond.notify_all();
+ }
+ 
+ static void ggml_vk_destroy_pipeline(vk::Device& device, vk_pipeline& pipeline) {
+@@ -5292,7 +5293,9 @@ static void ggml_vk_load_shaders(vk_device& device) {
+     }
+ 
+     for (auto &c : compiles) {
+-        c.wait();
++        // wait() discards the exception, leaving a null pipeline that Adreno
++        // later dereferences in vkCmdBindPipeline. Propagate a request failure.
++        c.get();
+     }
+ }
+ 
+@@ -16316,6 +16319,10 @@ static bool ggml_backend_vk_device_supports_op(ggml_backend_dev_t dev, const ggm
+         case GGML_OP_MUL_MAT_ID:
+             {
+                 ggml_type src0_type = op->src[0]->type;
++                if (device->vendor_id == VK_VENDOR_ID_QUALCOMM &&
++                    ggml_is_quantized(src0_type) && std::getenv("SIQI_VK_CPU_QUANT")) {
++                    return false; // opt-in fallback, not a quantized GPU-kernel claim
++                }
+                 if (op->op == GGML_OP_MUL_MAT_ID) {
+                     if (!device->mul_mat_id_s[src0_type] && !device->mul_mat_id_m[src0_type] && !device->mul_mat_id_l[src0_type]) {
+                         // If there's not enough shared memory for row_ids and the result tile, fallback to CPU

@@ -1,0 +1,9 @@
+KleidiAI v1.24.0
+Copyright 2024-2026 Arm Limited and/or its affiliates.
+https://github.com/ARM-software/kleidiai
+
+The optional SIQI LES runtime links unmodified KleidiAI CPU kernels from
+the pinned llama.cpp-omni dependency. KleidiAI source retains its individual
+SPDX copyright and license notices. Apache-2.0 and BSD-3-Clause license texts
+are bundled alongside this attribution. These notices do not imply affiliation
+with or endorsement by Arm.

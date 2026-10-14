@@ -9,6 +9,66 @@ class AppLocalizationsJa extends AppLocalizations {
   AppLocalizationsJa([String locale = 'ja']) : super(locale);
 
   @override
+  String get lesExpertCache => 'LES エキスパートキャッシュ（元のモデルは保持）';
+
+  @override
+  String get lesTextOnly => 'LES テキスト実行環境・画像処理は未有効化';
+
+  @override
+  String get lesPreparationNotice =>
+      '初回はエキスパートを自動で再配置し検証します。モデルとほぼ同じ追加容量が必要です。元の重みは変更しません。';
+
+  @override
+  String get modelRuntimePending => 'ダウンロード可能・専用ランタイムは対応中';
+
+  @override
+  String get keepScreenAwake => '前面で画面を常時点灯';
+
+  @override
+  String get keepScreenAwakeDescription =>
+      '初期設定はオン。バックグラウンドではシステム設定に従います。電池消費が増える場合があります。';
+
+  @override
+  String get agentTraces => 'Agent 実行履歴';
+
+  @override
+  String get agentTraceDescription => '手順・結果・終了理由を端末に記録。再現と評価用に JSON を書き出します。';
+
+  @override
+  String get exportAgentTrace => 'Agent 履歴を書き出す';
+
+  @override
+  String get exportFailedAgentTrace => '失敗ログを書き出す';
+
+  @override
+  String get tracePrivacyWarning =>
+      'ログには指示・コード・ツール出力が含まれる場合があります。一般的な認証情報はマスクしますが、共有前に確認してください。';
+
+  @override
+  String get traceDelete => 'この履歴を削除';
+
+  @override
+  String get traceEmpty => 'Agent 実行履歴はまだありません';
+
+  @override
+  String get traceInterrupted => 'アプリの再起動で中断';
+
+  @override
+  String get traceExportFailed => '履歴を書き出せませんでした。再試行してください。';
+
+  @override
+  String get releaseActiveModel => '実行中のモデルを解放';
+
+  @override
+  String get releaseActiveModelDescription => '生成を停止し、ネイティブモデルのメモリを解放します。';
+
+  @override
+  String get modelMemoryReleased => 'モデルのメモリを解放しました';
+
+  @override
+  String get runtimeSpillCache => '推論の一時キャッシュ';
+
+  @override
   String get lanGateway => 'LAN ゲートウェイ';
 
   @override
@@ -61,6 +121,23 @@ class AppLocalizationsJa extends AppLocalizations {
   String get benchmarkTitle => 'Performance lab';
 
   @override
+  String get benchmarkContextNote =>
+      'ウィンドウは確保容量です。実際の文書を選び入力トークン数を確認してください。短い入力では長い文脈を検証できません。文書本文は記録しません。';
+
+  @override
+  String get benchmarkReuseModel => '読み込み済みモデルでウォームテスト';
+
+  @override
+  String get benchmarkReuseModelNote =>
+      'オフの場合はモデルを解放してから読み込みます。ファイルキャッシュは消去しません。実際の再利用状態を結果に記録します。';
+
+  @override
+  String get benchmarkPickDocument => '長い入力の検証用に文書を選択';
+
+  @override
+  String get benchmarkResetDocument => '内蔵の短文テストに戻す';
+
+  @override
   String get benchmarkWarning =>
       'Experiments load large models and consume power. Keep ventilation; stop on severe system heat. Results do not imply 5 t/s has been achieved.';
 
@@ -88,6 +165,19 @@ class AppLocalizationsJa extends AppLocalizations {
 
   @override
   String get benchmarkRunning => 'Running controlled experiment…';
+
+  @override
+  String benchmarkPrefillProgress(int evaluated, int total) {
+    return '実際の入力を処理中：$evaluated / $total tokens。全入力の処理後にデコード速度を測定します。';
+  }
+
+  @override
+  String benchmarkThreadSweepProgress(int completed, int total) {
+    return '同一入力状態でスレッド比較：$completed / $total。全設定を記録し、最高値を自動選択しません。';
+  }
+
+  @override
+  String get benchmarkBusy => '推論または性能テストが実行中です。完了してから再試行してください。';
 
   @override
   String get benchmarkDescription =>

@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/icons/siqi_icons.dart';
@@ -76,9 +78,9 @@ class _ConversationSettingsPageState
     final settings = ref.watch(settingsProvider);
     final update = ref.read(settingsProvider.notifier).update;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.conversationReasoning)),
+      appBar: SiqiPageBar(title: Text(context.l10n.conversationReasoning)),
       body: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
           DropdownButtonFormField<ReasoningEffort>(
             initialValue: settings.reasoningEffort,
@@ -111,7 +113,7 @@ class _ConversationSettingsPageState
           DropdownButtonFormField<int>(
             initialValue: _contextOptions.contains(settings.contextWindow)
                 ? settings.contextWindow
-                : 32768,
+                : 65536,
             decoration: InputDecoration(
               labelText: context.l10n.contextWindow,
               prefixIcon: const Padding(
@@ -135,7 +137,7 @@ class _ConversationSettingsPageState
           DropdownButtonFormField<int>(
             initialValue: _outputOptions.contains(settings.maxTokens)
                 ? settings.maxTokens
-                : 4096,
+                : 65536,
             decoration: InputDecoration(
               labelText: context.l10n.maxTokens,
               prefixIcon: const Padding(

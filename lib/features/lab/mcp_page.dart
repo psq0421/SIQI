@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -166,7 +168,7 @@ class _McpPageState extends ConsumerState<McpPage> {
   Widget build(BuildContext context) {
     final servers = ref.watch(mcpServersProvider);
     return Scaffold(
-      appBar: AppBar(
+      appBar: SiqiPageBar(
         title: Text(context.l10n.mcpTitle),
         actions: [
           IconButton(

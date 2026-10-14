@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/app_models.dart';
+import 'benchmark_journal.dart';
 import 'local_inference_service.dart';
 import 'platform_service.dart';
 
@@ -44,6 +45,11 @@ class PerformanceBenchmarkService {
 
   final PlatformService _platform;
   final LocalInferenceService _inference;
+  final _runGate = BenchmarkRunGate();
+
+  bool tryBeginRun(Object owner) => !_inference.busy && _runGate.acquire(owner);
+
+  void endRun(Object owner) => _runGate.release(owner);
 
   Future<PerformanceSample> sample(String stage) async => PerformanceSample(
     at: DateTime.now(),
@@ -61,6 +67,7 @@ class PerformanceBenchmarkService {
     int contextWindow = 2048,
     int maxTokens = 128,
     LocalInferenceTuning? tuning,
+    void Function(Map<String, dynamic> event)? onProgress,
   }) async {
     final started = DateTime.now();
     final clock = Stopwatch()..start();
@@ -84,6 +91,7 @@ class PerformanceBenchmarkService {
       topP: 1,
       maxTokens: maxTokens,
       tuning: tuning,
+      onProgress: onProgress,
     );
     final elapsed = clock.elapsed;
     final after = await _platform.processStats();

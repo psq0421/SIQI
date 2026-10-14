@@ -22,6 +22,7 @@ import '../services/deepseek_harness_service.dart';
 import '../services/github_service.dart';
 import '../services/harness_service.dart';
 import '../services/local_inference_service.dart';
+import '../services/minicpm_les_backend.dart';
 import '../services/model_download_service.dart';
 import '../services/mcp_service.dart';
 import '../services/notification_service.dart';
@@ -230,6 +231,9 @@ final permissionAuditProvider = FutureProvider(
 );
 final workLogsProvider = FutureProvider(
   (ref) => ref.watch(localDatabaseProvider).listWorkLogs(),
+);
+final lesCacheSizeProvider = FutureProvider.autoDispose<int>(
+  (ref) => MiniCpmLesBackend.cacheSize(),
 );
 final cacheSizeProvider = FutureProvider<int>(
   (ref) => ref.watch(cacheServiceProvider).size(),

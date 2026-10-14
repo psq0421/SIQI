@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import '../services/trace_redactor.dart';
+
 import 'package:dio/dio.dart';
 import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -134,6 +136,8 @@ class ChatController extends StateNotifier<ChatState> {
   CancelToken? _cancelToken;
   bool _sendInFlight = false;
   bool _cancelRequested = false;
+  String? _pendingAgentTraceId;
+  bool _agentExecutionInFlight = false;
 
   Future<void> initialize() async {
     final sessions = await _database.listSessions();
@@ -160,6 +164,8 @@ class ChatController extends StateNotifier<ChatState> {
   );
 
   Future<void> selectSession(ChatSession session) async {
+    if (state.sending || _agentExecutionInFlight) return;
+    await clearAgentActions();
     state = state.copyWith(
       currentSession: session,
       messages: await _database.listMessages(session.id),
@@ -169,6 +175,8 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> newSession(String title) async {
+    if (state.sending || _agentExecutionInFlight) return;
+    await clearAgentActions();
     final now = DateTime.now();
     final session = ChatSession(
       id: _uuid.v4(),
@@ -187,6 +195,8 @@ class ChatController extends StateNotifier<ChatState> {
   }
 
   Future<void> deleteSession(ChatSession session) async {
+    if (state.sending || _agentExecutionInFlight) return;
+    if (state.currentSession?.id == session.id) await clearAgentActions();
     await _database.deleteSession(session.id);
     final sessions = await _database.listSessions();
     final current = sessions.firstOrNull;
@@ -218,7 +228,12 @@ class ChatController extends StateNotifier<ChatState> {
     required String newConversationTitle,
   }) async {
     final text = rawText.trim();
-    if (text.isEmpty || state.sending || _sendInFlight) return;
+    if (text.isEmpty ||
+        state.sending ||
+        _sendInFlight ||
+        _agentExecutionInFlight) {
+      return;
+    }
     // Database persistence starts before `state.sending` becomes visible.
     // Lock synchronously so rapid taps cannot start two requests against the
     // same local engine during that short window.
@@ -277,12 +292,48 @@ class ChatController extends StateNotifier<ChatState> {
       agentResults: const [],
       rollbackComplete: false,
     );
+    String? requestTraceId;
+    var traceSettled = false;
+    var terminalStatus = 'failed';
+    var terminalReason = 'unexpected_failure';
+    var interruptedText = '';
     try {
+      if (_pendingAgentTraceId != null) {
+        await _agent.finishTask(
+          _pendingAgentTraceId!,
+          'cancelled',
+          'superseded_request',
+        );
+        _pendingAgentTraceId = null;
+      }
+      if (settings.selectedChatMode == ChatMode.agent) {
+        requestTraceId = await _agent.beginTask(
+          workspacePath: settings.activeWorkspacePath!,
+          instruction: text,
+          modelId: settings.selectedModelId,
+          sessionId: session.id,
+        );
+      }
       final result = await _complete(settings, updatedMessages);
       _throwIfCancelled();
       final envelope = settings.selectedChatMode == ChatMode.agent
           ? AgentEnvelope.tryParse(result.text)
           : null;
+      if (requestTraceId != null) {
+        if (envelope == null && result.text.contains('<siqi_actions>')) {
+          await _agent.finishTask(
+            requestTraceId,
+            'failed',
+            'invalid_action_protocol',
+          );
+        } else {
+          await _agent.recordPlan(requestTraceId, envelope);
+          if (envelope != null && envelope.actions.isNotEmpty) {
+            _pendingAgentTraceId = requestTraceId;
+          }
+        }
+        traceSettled = true;
+      }
       final visibleText = envelope == null
           ? result.text
           : result.text
@@ -311,6 +362,7 @@ class ChatController extends StateNotifier<ChatState> {
         sessions: await _database.listSessions(),
       );
     } on _ChatGuardException catch (error) {
+      terminalReason = 'guard:${error.code.name}';
       state = state.copyWith(
         sending: false,
         cancelling: false,
@@ -318,6 +370,9 @@ class ChatController extends StateNotifier<ChatState> {
         errorDetail: error.detail,
       );
     } on LocalInferenceCancelledException {
+      terminalStatus = 'cancelled';
+      terminalReason = 'user_cancelled';
+      interruptedText = state.partialResponse;
       await _database.addWorkLog(
         category: 'inference',
         title: 'cancelled:${settings.selectedModelId}',
@@ -331,6 +386,8 @@ class ChatController extends StateNotifier<ChatState> {
         clearError: true,
       );
     } on LocalInferenceException catch (error) {
+      terminalReason = error.toString();
+      interruptedText = state.partialResponse;
       await _database.addWorkLog(
         category: 'inference',
         title: 'failed:${settings.selectedModelId}',
@@ -344,7 +401,12 @@ class ChatController extends StateNotifier<ChatState> {
         errorDetail: error.stage.name,
       );
     } on DioException catch (error) {
+      interruptedText = state.partialResponse;
+      terminalReason =
+          'api:${error.type.name}:${error.response?.statusCode ?? 0}';
       if (_cancelRequested || CancelToken.isCancel(error)) {
+        terminalStatus = 'cancelled';
+        terminalReason = 'user_cancelled';
         state = state.copyWith(
           sending: false,
           cancelling: false,
@@ -365,6 +427,8 @@ class ChatController extends StateNotifier<ChatState> {
         errorDetail: error.message,
       );
     } on Object catch (error) {
+      terminalReason = error.toString();
+      interruptedText = state.partialResponse;
       state = state.copyWith(
         sending: false,
         cancelling: false,
@@ -373,6 +437,26 @@ class ChatController extends StateNotifier<ChatState> {
       );
     } finally {
       _cancelToken = null;
+      if (requestTraceId != null && !traceSettled) {
+        await _agent.finishTask(requestTraceId, terminalStatus, terminalReason);
+      }
+      // Preserve the already-visible answer on a pressure/timeout/API error.
+      // A native stop is never represented as a silently disappearing reply.
+      if (interruptedText.trim().isNotEmpty) {
+        final partial = ChatMessage(
+          id: _uuid.v4(),
+          sessionId: session.id,
+          role: MessageRole.assistant,
+          content: interruptedText,
+          createdAt: DateTime.now(),
+          modelId: settings.selectedModelId,
+        );
+        await _database.saveMessage(partial);
+        state = state.copyWith(
+          messages: [...state.messages, partial],
+          partialResponse: '',
+        );
+      }
     }
   }
 
@@ -463,9 +547,7 @@ class ChatController extends StateNotifier<ChatState> {
           status.detail,
         );
       }
-      await _localInference.configureCpuAffinity(
-        _settings().selectedCpuCores,
-      );
+      await _localInference.configureCpuAffinity(_settings().selectedCpuCores);
       // A downloaded vision projector is not part of a text-only request's
       // working set. Keeping it out here avoids both needless model-load time
       // and a false low-memory rejection on otherwise capable phones.
@@ -574,7 +656,7 @@ class ChatController extends StateNotifier<ChatState> {
   Future<void> cancel() async {
     if (!state.sending || state.cancelling) return;
     _cancelRequested = true;
-    state = state.copyWith(cancelling: true, partialResponse: '');
+    state = state.copyWith(cancelling: true);
     _cancelToken?.cancel('user-cancelled');
     await _localInference.cancel();
   }
@@ -590,14 +672,40 @@ class ChatController extends StateNotifier<ChatState> {
   }) async {
     final workspace = _settings().activeWorkspacePath;
     final envelope = state.agentEnvelope;
-    if (workspace == null || envelope == null) return;
-    final results = await _agent.execute(
-      workspacePath: workspace,
-      actions: envelope.actions,
-      shellEnvironment: _settings().shellEnvironment,
-      allowMutations: allowMutations,
-    );
-    state = state.copyWith(agentResults: results);
+    if (workspace == null ||
+        envelope == null ||
+        _agentExecutionInFlight ||
+        state.agentResults.isNotEmpty) {
+      return;
+    }
+    _agentExecutionInFlight = true;
+    try {
+      final traceId = _pendingAgentTraceId;
+      _pendingAgentTraceId = null;
+      final results = await _agent.execute(
+        workspacePath: workspace,
+        actions: envelope.actions,
+        shellEnvironment: _settings().shellEnvironment,
+        allowMutations: allowMutations,
+        traceId: traceId,
+        inputInstruction:
+            state.messages
+                .where((message) => message.role == MessageRole.user)
+                .lastOrNull
+                ?.content ??
+            '',
+      );
+      state = state.copyWith(agentResults: results);
+    } on Object catch (error) {
+      if (mounted) {
+        state = state.copyWith(
+          errorCode: ChatErrorCode.requestFailed,
+          errorDetail: TraceRedactor.sanitize(error.toString()),
+        );
+      }
+    } finally {
+      _agentExecutionInFlight = false;
+    }
   }
 
   Future<void> rollbackLastAgentExecution() async {
@@ -641,11 +749,19 @@ class ChatController extends StateNotifier<ChatState> {
     );
   }
 
-  void clearAgentActions() => state = state.copyWith(
-    clearAgentEnvelope: true,
-    agentResults: const [],
-    rollbackComplete: false,
-  );
+  Future<void> clearAgentActions() async {
+    if (_agentExecutionInFlight) return;
+    final id = _pendingAgentTraceId;
+    _pendingAgentTraceId = null;
+    if (id != null) {
+      await _agent.finishTask(id, 'cancelled', 'user_rejected_actions');
+    }
+    state = state.copyWith(
+      clearAgentEnvelope: true,
+      agentResults: const [],
+      rollbackComplete: false,
+    );
+  }
 
   @override
   void dispose() {

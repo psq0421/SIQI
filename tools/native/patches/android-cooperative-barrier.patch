@@ -1,0 +1,34 @@
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.c b/ggml/src/ggml-cpu/ggml-cpu.c
+index cd5c61a..3e0316d 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.c
++++ b/ggml/src/ggml-cpu/ggml-cpu.c
+@@ -587,8 +587,29 @@ void ggml_barrier(struct ggml_threadpool * tp) {
+     }
+ 
+     // wait for other threads
++#if defined(__ANDROID__)
++    // SIQI: poll=0 must also be cooperative at long barriers, not merely
++    // while idle. Heterogeneous/throttled cores and asynchronous page-in can
++    // otherwise leave the faster cores burning their entire scheduler slice.
++    // Preserve the barrier and memory-order contract; never skip participants.
++    uint32_t siqi_spins = 0;
++    int64_t siqi_sleep_after_ns = 0;
++#endif
+     while (atomic_load_explicit(&tp->n_barrier_passed, memory_order_relaxed) == n_passed) {
+         ggml_thread_cpu_relax();
++#if defined(__ANDROID__)
++        if (tp->poll == 0 && (++siqi_spins & 1023) == 0) {
++            struct timespec siqi_now;
++            if (clock_gettime(CLOCK_MONOTONIC, &siqi_now) == 0) {
++                const int64_t siqi_ns = (int64_t) siqi_now.tv_sec * 1000000000 + siqi_now.tv_nsec;
++                if (!siqi_sleep_after_ns) siqi_sleep_after_ns = siqi_ns + 250000;
++                if (siqi_ns >= siqi_sleep_after_ns) {
++                    const struct timespec siqi_pause = {0, 100000};
++                    nanosleep(&siqi_pause, NULL);
++                }
++            }
++        }
++#endif
+     }
+ 
+     // exit barrier (full seq-cst fence)

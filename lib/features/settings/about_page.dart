@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/constants/app_constants.dart';
@@ -15,7 +17,7 @@ class AboutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(context.l10n.aboutLegal)),
+    appBar: SiqiPageBar(title: Text(context.l10n.aboutLegal)),
     body: ListView(
       padding: const EdgeInsets.all(12),
       children: [
@@ -53,6 +55,11 @@ class AboutPage extends StatelessWidget {
                 leading: const SiqiIcon(SiqiGlyph.shield),
                 title: Text(context.l10n.licenseTitle),
                 subtitle: Text(context.l10n.licenseBody),
+                onTap: () => showLicensePage(
+                  context: context,
+                  applicationName: context.l10n.appName,
+                  applicationVersion: context.l10n.versionLabel,
+                ),
               ),
             ],
           ),

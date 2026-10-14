@@ -6,8 +6,11 @@ import 'package:llamadart/llamadart.dart';
 
 import '../models/app_models.dart';
 import 'file_content_service.dart';
+import 'generation_delta_timings.dart';
+import 'inference_health_policy.dart';
 import 'platform_service.dart';
 import 'resource_planner.dart';
+import 'minicpm_les_backend.dart';
 
 class LocalEngineStatus {
   const LocalEngineStatus({
@@ -49,6 +52,9 @@ class LocalInferenceTuning {
     this.microBatchSize = 64,
     this.cacheType = 'q8_0',
     this.flashAttention = true,
+    this.expertWindow = 56,
+    this.prefetchDepth = 4,
+    this.decodeThreadSweep = false,
   });
   final GpuBackend backend;
   final int gpuLayers;
@@ -57,6 +63,11 @@ class LocalInferenceTuning {
   final int microBatchSize;
   final String cacheType;
   final bool flashAttention;
+  final int expertWindow;
+  final int prefetchDepth;
+
+  /// Lab-only comparison from an identical prefilled native state.
+  final bool decodeThreadSweep;
 }
 
 class _LoadAttempt {
@@ -94,8 +105,11 @@ class LocalInferenceService {
   /// also govern llama.cpp threads instead of only the UI isolate.
   Future<void> configureCpuAffinity(List<int> cores) async {
     if (cores.isEmpty) return;
-    await _platformChannel.invokeMethod<bool>('setCpuAffinity', {'cores': cores});
+    await _platformChannel.invokeMethod<bool>('setCpuAffinity', {
+      'cores': cores,
+    });
   }
+
   LlamaEngine? _engine;
   String? _loadedModelPath;
   String? _loadedProjectorPath;
@@ -103,11 +117,14 @@ class LocalInferenceService {
   Future<void>? _loading;
   bool _disposed = false;
   bool _cancellationRequested = false;
+  String? _interruptionReason;
   Completer<void>? _requestDone;
-  bool get busy => _requestDone != null;
+  Future<void>? _unloading;
+  bool get busy => _requestDone != null || _unloading != null;
   Map<String, Object?>? lastPerformance;
   bool _fileBackedRepack = false;
   _LoadAttempt? _effectiveAttempt;
+  MiniCpmLesBackend? _les;
 
   Future<LocalEngineStatus> status() async {
     if (!Platform.isAndroid) {
@@ -147,13 +164,25 @@ class LocalInferenceService {
     required int maxTokens,
     LocalInferenceTuning? tuning,
     void Function(String text)? onText,
+    void Function(Map<String, dynamic> event)? onProgress,
   }) async {
+    // A model can finish generating while its file mappings are still being
+    // released off the UI. Wait before creating the next native owner.
+    final unloading = _unloading;
+    if (unloading != null) await unloading;
     if (busy) throw StateError('local-inference-busy');
     final done = Completer<void>();
     _requestDone = done;
     lastPerformance = null;
+    _cancellationRequested = false;
+    _interruptionReason = null;
     var checkingPressure = false;
     var criticalPressure = false;
+    final health = InferenceHealthPolicy();
+    var peakRssBytes = 0;
+    var rssSamples = 0;
+    final requestStarted = DateTime.now();
+    final memoryBudgetBytes = model.memoryBudgetBytes;
     final watchdog = Timer.periodic(const Duration(seconds: 2), (_) async {
       if (checkingPressure) return;
       checkingPressure = true;
@@ -164,10 +193,29 @@ class LocalInferenceService {
         final stats = await _platformChannel.invokeMapMethod<String, dynamic>(
           'processStats',
         );
-        if (identical(_requestDone, done) &&
-            ((threshold > 0 && available < threshold) ||
-                (stats?['thermalStatus'] as int? ?? 0) >= 3)) {
+        final rssBytes = stats?['rssBytes'] as int? ?? 0;
+        if (rssBytes > 0) rssSamples++;
+        if (rssBytes > peakRssBytes) peakRssBytes = rssBytes;
+        final thermal = stats?['thermalStatus'] as int? ?? 0;
+        // SEVERE (3) means throttling, not shutdown. Cancelling on it made
+        // long conversations silently disappear as if the user pressed Stop.
+        final reason = health.observe(
+          availableBytes: available,
+          lowMemoryThresholdBytes: threshold,
+          thermalStatus: thermal,
+          rssBytes: rssBytes,
+          // File-backed LES has no fixed resident quota. Retain the measured
+          // 5GB research target in metadata, but use actual Android pressure
+          // and critical thermal state for cancellation, not an arbitrary cap.
+          memoryBudgetBytes:
+              MiniCpmLesBackend.bundled &&
+                  model.runtimeProfile == 'minicpm-v47-35b-les'
+              ? null
+              : memoryBudgetBytes,
+        );
+        if (identical(_requestDone, done) && reason != null) {
           criticalPressure = true;
+          _interruptionReason = reason;
           await cancel();
         }
       } on Object {
@@ -188,12 +236,45 @@ class LocalInferenceService {
         maxTokens: maxTokens,
         onText: onText,
         tuning: tuning,
+        onProgress: onProgress,
       );
+    } on Object catch (error) {
+      lastPerformance = {
+        ...?lastPerformance,
+        'modelId': model.id,
+        'requestedContext': contextWindow,
+        'effectiveContext': _loadedContextSize,
+        'runtimeProfile': model.runtimeProfile,
+        'memoryBudgetBytes': memoryBudgetBytes,
+        'status': error is LocalInferenceCancelledException
+            ? 'cancelled'
+            : 'failed',
+        'failureStage': error is LocalInferenceException
+            ? error.stage.name
+            : 'request',
+        'terminationReason':
+            _interruptionReason ??
+            (error is LocalInferenceException
+                ? error.cause.toString()
+                : error.runtimeType.toString()),
+      };
+      rethrow;
     } finally {
       watchdog.cancel();
-      if (criticalPressure) await _releaseEngine();
-      _requestDone = null;
-      done.complete();
+      lastPerformance = {
+        ...?lastPerformance,
+        'requestStartedAt': requestStarted.toUtc().toIso8601String(),
+        'sampledPeakRssBytes': peakRssBytes,
+        'rssSamples': rssSamples,
+      };
+      try {
+        if (criticalPressure || _interruptionReason != null) {
+          await _releaseEngine();
+        }
+      } finally {
+        _requestDone = null;
+        done.complete();
+      }
     }
   }
 
@@ -208,13 +289,40 @@ class LocalInferenceService {
     required int maxTokens,
     LocalInferenceTuning? tuning,
     void Function(String text)? onText,
+    void Function(Map<String, dynamic> event)? onProgress,
   }) async {
-    _cancellationRequested = false;
+    if (!model.runnable) {
+      throw const LocalInferenceException(
+        LocalInferenceStage.modelLoad,
+        'model-runtime-not-bundled',
+      );
+    }
     if (_disposed) {
       throw const LocalInferenceException(
         LocalInferenceStage.modelLoad,
         'inference service disposed',
       );
+    }
+    if (model.runtimeProfile == 'minicpm-v47-35b-les' &&
+        MiniCpmLesBackend.bundled) {
+      return _completeLes(
+        model: model,
+        artifactPaths: artifactPaths,
+        messages: messages,
+        systemPrompt: systemPrompt,
+        contextWindow: contextWindow,
+        temperature: temperature,
+        topP: topP,
+        maxTokens: maxTokens,
+        onText: onText,
+        tuning: tuning,
+        onProgress: onProgress,
+      );
+    }
+    // Only one backend can own the phone's model working set at a time.
+    if (_les != null) {
+      await _les!.close();
+      _les = null;
     }
     final primaryId = model.primaryArtifact?.id ?? 'model';
     final modelPath = artifactPaths[primaryId];
@@ -224,7 +332,14 @@ class LocalInferenceService {
         'primary model artifact missing',
       );
     }
-    final projectorPath = model.projectorArtifact == null
+    final hasImageInput = messages.any(
+      (message) => message.attachments.any(
+        (attachment) => attachment.mimeType.startsWith('image/'),
+      ),
+    );
+    // A visual encoder consumes hundreds of MB even for a text-only turn.
+    // Load it only when an image is present; the next text turn unloads it.
+    final projectorPath = model.projectorArtifact == null || !hasImageInput
         ? null
         : artifactPaths[model.projectorArtifact!.id];
     final file = File(modelPath);
@@ -275,6 +390,8 @@ class LocalInferenceService {
             backendHint: 'auto',
             cacheType: 'q8_0',
             flashAttention: true,
+            memoryBudgetBytes: model.memoryBudgetBytes,
+            runtimeProfile: model.runtimeProfile,
           )
         : isProjectorUpgrade
         ? await _projectorUpgradePlan(
@@ -368,25 +485,45 @@ class LocalInferenceService {
     );
     final buffer = StringBuffer();
     final generationClock = Stopwatch()..start();
-    int? firstDeltaMs;
+    final deltaTimings = GenerationDeltaTimings();
     try {
-      await for (final chunk in engine.create(
-        fitted.messages,
-        enableThinking: false,
-        params: GenerationParams(
-          maxTokens: availableOutput,
-          temp: temperature,
-          topP: topP,
-          topK: 40,
-          penalty: 1.1,
-        ),
-      )) {
+      await for (final chunk
+          in engine
+              .create(
+                fitted.messages,
+                enableThinking: false,
+                params: GenerationParams(
+                  maxTokens: availableOutput,
+                  temp: temperature,
+                  topP: topP,
+                  topK: 40,
+                  penalty: 1.1,
+                  // MiniCPM5 explicitly recommends min_p=0 to avoid repetition loops.
+                  minP: 0,
+                ),
+              )
+              .timeout(
+                const Duration(minutes: 5),
+                onTimeout: (sink) {
+                  // Native cancellation is cooperative. Never dispose live tensors
+                  // while a native decode call may still be using them.
+                  _interruptionReason = 'generation-idle-timeout';
+                  engine.cancelGeneration();
+                  sink.addError(
+                    const LocalInferenceException(
+                      LocalInferenceStage.generation,
+                      'generation-idle-timeout',
+                    ),
+                  );
+                  sink.close();
+                },
+              )) {
         final first = chunk.choices.firstOrNull?.delta;
-        if (firstDeltaMs == null &&
-            ((first?.content?.isNotEmpty ?? false) ||
-                (first?.thinking?.isNotEmpty ?? false))) {
-          firstDeltaMs = generationClock.elapsedMilliseconds;
-        }
+        deltaTimings.observe(
+          elapsedMs: generationClock.elapsedMilliseconds,
+          content: first?.content,
+          reasoning: first?.thinking,
+        );
         final delta = first?.content;
         if (delta == null || delta.isEmpty) continue;
         buffer.write(delta);
@@ -394,24 +531,44 @@ class LocalInferenceService {
       }
     } on Object catch (error) {
       if (_cancellationRequested) {
+        if (_interruptionReason != null) {
+          throw LocalInferenceException(
+            LocalInferenceStage.generation,
+            _interruptionReason!,
+          );
+        }
         throw const LocalInferenceCancelledException();
       }
       throw LocalInferenceException(LocalInferenceStage.generation, error);
     }
 
     if (_cancellationRequested) {
+      if (_interruptionReason != null) {
+        throw LocalInferenceException(
+          LocalInferenceStage.generation,
+          _interruptionReason!,
+        );
+      }
       throw const LocalInferenceCancelledException();
     }
 
     final perf = await engine.getPerformanceContext();
     lastPerformance = {
       'runtime': 'llama.cpp-b10333/llamadart-0.8.19',
+      'status': 'completed',
       'modelId': model.id,
       'requestedContext': contextWindow,
       'effectiveContext': actualContext,
       'contextWasReduced': actualContext < contextWindow,
       'effectiveBackend': await engine.getBackendName(),
       'effectiveGpuLayers': await engine.getResolvedGpuLayers(),
+      // A multimodal catalog entry is not proof of a loaded visual encoder.
+      // Keep text decode and image/projector measurements distinguishable.
+      'requestedMode': hasImageInput ? 'vision' : 'text_only',
+      'visionProjectorLoaded': _loadedProjectorPath != null,
+      'inputTokensAfterFitting': fitted.inputTokens,
+      'historyMessagesBeforeFitting': llamaMessages.length,
+      'historyMessagesAfterFitting': fitted.messages.length,
       'threads': _effectiveAttempt?.threadCount,
       'batch': _effectiveAttempt?.batchSize,
       'microBatch': _effectiveAttempt?.microBatchSize,
@@ -420,7 +577,7 @@ class LocalInferenceService {
       'coldLoad': !canReuseLoadedAllocation,
       'context': actualContext,
       'loadWallMs': loadWallMs,
-      'firstVisibleDeltaMs': firstDeltaMs,
+      ...deltaTimings.toJson(),
       'generationWallMs': generationClock.elapsedMilliseconds,
       'promptEvalTokens': perf?.promptEvalTokens,
       'promptEvalMs': perf?.promptEvalMs,
@@ -433,6 +590,8 @@ class LocalInferenceService {
       'pressure': plan.pressureLevel,
       'swapAssisted': plan.swapAssisted,
       'fileBackedRepack': _fileBackedRepack,
+      'memoryBudgetBytes': plan.memoryBudgetBytes,
+      'runtimeProfile': plan.runtimeProfile,
     };
 
     final text = buffer.toString().trim();
@@ -447,6 +606,119 @@ class LocalInferenceService {
       text,
       TokenUsage(input: fitted.inputTokens, output: outputTokens),
     );
+  }
+
+  Future<CompletionResult> _completeLes({
+    required ModelDefinition model,
+    required Map<String, String> artifactPaths,
+    required List<ChatMessage> messages,
+    required String systemPrompt,
+    required int contextWindow,
+    required double temperature,
+    required double topP,
+    required int maxTokens,
+    LocalInferenceTuning? tuning,
+    void Function(String text)? onText,
+    void Function(Map<String, dynamic> event)? onProgress,
+  }) async {
+    // The text runtime deliberately does not load a visual encoder. Reject
+    // image/audio inputs rather than quietly presenting text-only inference
+    // as multimodal support; other model backends retain their vision path.
+    if (messages.any(
+      (message) => message.attachments.any(
+        (attachment) =>
+            attachment.mimeType.startsWith('image/') ||
+            attachment.mimeType.startsWith('audio/'),
+      ),
+    )) {
+      throw const LocalInferenceException(
+        LocalInferenceStage.prompt,
+        'les-vision-runtime-not-bundled',
+      );
+    }
+    final path = artifactPaths[model.primaryArtifact?.id ?? 'model'];
+    if (path == null || !await File(path).exists()) {
+      throw const LocalInferenceException(
+        LocalInferenceStage.modelLoad,
+        'primary model artifact missing',
+      );
+    }
+    if (_engine != null) await _releaseEngine();
+    if (_cancellationRequested) throw const LocalInferenceCancelledException();
+    final backend = _les ??= MiniCpmLesBackend();
+    final cache = await MiniCpmLesBackend.cacheDirectory(model.id);
+    final context = contextWindow.clamp(2048, 131072).toInt();
+    final requestedOutput = maxTokens.clamp(1, context ~/ 2).toInt();
+    final preparedMessages = <Map<String, String>>[
+      if (systemPrompt.trim().isNotEmpty)
+        {'role': 'system', 'content': systemPrompt.trim()},
+      for (final message in messages)
+        {
+          'role': message.role.name,
+          'content': [
+            message.content,
+            for (final attachment in message.attachments)
+              if (attachment.extractedText?.isNotEmpty == true)
+                '\n[${attachment.name}]\n${attachment.extractedText}',
+          ].join('\n'),
+        },
+    ];
+    final clock = Stopwatch()..start();
+    final timings = GenerationDeltaTimings();
+    try {
+      final result = await backend.generate(
+        onProgress: onProgress,
+        request: {
+          'modelPath': path,
+          'cacheDirectory': cache.path,
+          'context': context,
+          'maxTokens': requestedOutput,
+          'temperature': temperature,
+          'topP': topP,
+          'threads': (tuning?.threads ?? 4).clamp(1, 8),
+          'expertWindow': (tuning?.expertWindow ?? 56).clamp(16, 128),
+          'prefetchDepth': (tuning?.prefetchDepth ?? 4).clamp(0, 4),
+          'microBatchSize': (tuning?.microBatchSize ?? 8).clamp(1, 16),
+          'decodeThreadSweep': tuning?.decodeThreadSweep ?? false,
+          'messages': preparedMessages,
+        },
+        onText: (text) {
+          timings.observe(elapsedMs: clock.elapsedMilliseconds, content: text);
+          onText?.call(text);
+        },
+      );
+      if (_cancellationRequested) {
+        throw const LocalInferenceCancelledException();
+      }
+      _loadedContextSize = context;
+      lastPerformance = {
+        ...Map<String, Object?>.from(result['performance'] as Map),
+        'status': 'completed',
+        'modelId': model.id,
+        'requestedContext': contextWindow,
+        'contextWasReduced': context != contextWindow,
+        'requestedMaxOutput': maxTokens,
+        'effectiveMaxOutput': requestedOutput,
+        'maxOutputWasReduced': requestedOutput != maxTokens,
+        'runtimeProfile': model.runtimeProfile,
+        'memoryBudgetBytes': model.memoryBudgetBytes,
+        'generationWallMs': clock.elapsedMilliseconds,
+        ...timings.toJson(),
+      };
+      return CompletionResult(
+        result['text'] as String,
+        TokenUsage(
+          input: result['inputTokens'] as int,
+          output: result['outputTokens'] as int,
+        ),
+      );
+    } on LesCancelledException {
+      throw const LocalInferenceCancelledException();
+    } on LocalInferenceCancelledException {
+      rethrow;
+    } on Object catch (error) {
+      throw LocalInferenceException(LocalInferenceStage.generation, error);
+    }
   }
 
   Future<LlamaChatMessage> _toLlamaMessage(
@@ -783,13 +1055,26 @@ class LocalInferenceService {
   Future<void> cancel() async {
     _cancellationRequested = true;
     _engine?.cancelGeneration();
+    _les?.cancel();
   }
 
   /// Stops generation and releases the native model allocation. This is
   /// intentionally explicit so users can reclaim memory after a long task.
-  Future<void> unloadModel() async {
+  Future<void> unloadModel() {
+    final current = _unloading;
+    if (current != null) return current;
+    late final Future<void> pending;
+    pending = _unloadOnce().whenComplete(() {
+      if (identical(_unloading, pending)) _unloading = null;
+    });
+    _unloading = pending;
+    return pending;
+  }
+
+  Future<void> _unloadOnce() async {
     _cancellationRequested = true;
     _engine?.cancelGeneration();
+    _les?.cancel();
     await _requestDone?.future;
     while (_loading != null) {
       await _loading;
@@ -810,6 +1095,9 @@ class LocalInferenceService {
     _loadedContextSize = null;
     _effectiveAttempt = null;
     if (engine != null) await engine.dispose();
+    final les = _les;
+    _les = null;
+    if (les != null) await les.close();
   }
 
   void dispose() {

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -30,8 +32,21 @@ class _ModelMarketPageState extends ConsumerState<ModelMarketPage> {
               _taskGroup(model.task) == _task,
         )
         .toList();
+    int rank(ModelDefinition model) => switch (model.id) {
+      'local-minicpmv47-35b-mixq3' => 0,
+      'local-minicpmv47-35b-q4km' => 1,
+      _ => model.provider == 'OpenBMB' ? 2 : 3,
+    };
+    models.sort((a, b) {
+      final comparison = rank(a).compareTo(rank(b));
+      return comparison != 0
+          ? comparison
+          : ModelCatalog.models
+                .indexOf(a)
+                .compareTo(ModelCatalog.models.indexOf(b));
+    });
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.modelMarket)),
+      appBar: SiqiPageBar(title: Text(context.l10n.modelMarket)),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -151,6 +166,7 @@ class _ModelMarketPageState extends ConsumerState<ModelMarketPage> {
       ),
     );
     if (confirmed != true) return;
+    await ref.read(localInferenceServiceProvider).unloadModel();
     final removed = await ref.read(downloadProvider.notifier).remove(model.id);
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -196,12 +212,10 @@ class _ModelDownloadCard extends ConsumerWidget {
                     ),
                   ),
                 ),
-                Chip(
-                  label: Text(model.license),
-                  visualDensity: VisualDensity.compact,
-                ),
               ],
             ),
+            const SizedBox(height: 8),
+            Text(model.license, style: Theme.of(context).textTheme.labelMedium),
             Text(
               model.provider,
               style: TextStyle(
@@ -243,8 +257,22 @@ class _ModelDownloadCard extends ConsumerWidget {
                     avatar: const SiqiIcon(SiqiGlyph.check, size: 16),
                     label: Text(context.l10n.runtimeBundled),
                   ),
+                if (model.runtimeBundled &&
+                    model.runtimeProfile == 'minicpm-v47-35b-les')
+                  Chip(label: Text(context.l10n.lesTextOnly)),
+                if (!model.runtimeBundled && model.downloadable)
+                  Chip(
+                    avatar: const SiqiIcon(SiqiGlyph.info, size: 16),
+                    label: Text(context.l10n.modelRuntimePending),
+                  ),
               ],
             ),
+            if (model.runtimeBundled &&
+                model.runtimeProfile == 'minicpm-v47-35b-les')
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(context.l10n.lesPreparationNotice),
+              ),
             if (download != null &&
                 download!.status != DownloadStatus.idle) ...[
               const SizedBox(height: 10),
@@ -273,8 +301,10 @@ class _ModelDownloadCard extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+            Wrap(
+              alignment: WrapAlignment.end,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 if (onSource != null)
                   OutlinedButton.icon(
@@ -282,7 +312,6 @@ class _ModelDownloadCard extends ConsumerWidget {
                     icon: const SiqiIcon(SiqiGlyph.link),
                     label: Text(context.l10n.officialSource),
                   ),
-                if (onSource != null) const SizedBox(width: 8),
                 active
                     ? OutlinedButton.icon(
                         onPressed: onPause,

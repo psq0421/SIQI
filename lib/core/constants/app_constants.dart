@@ -1,11 +1,12 @@
 import '../models/app_models.dart';
+import 'minicpm_catalog.dart';
 
 abstract final class AppConstants {
   static const applicationId = 'com.psq.siqi';
   static const exportExtension = 'siqi';
   static const configExtension = 'siji_config';
   static const databaseName = 'siqi_local.db';
-  static const databaseVersion = 6;
+  static const databaseVersion = 7;
   static const preferredProjectsPath = '/storage/emulated/0/Siqi/Projects';
   static const githubCallbackScheme = 'siqi';
   static const projectUrl = 'https://github.com/psq0421/SIQI';
@@ -137,6 +138,7 @@ abstract final class AppConstants {
 
 abstract final class ModelCatalog {
   static const models = <ModelDefinition>[
+    ...MiniCpmCatalog.models,
     ModelDefinition(
       id: 'local-hunyuan-05b-q4km',
       displayName: 'Hunyuan-0.5B · Q4_K_M',
@@ -1084,7 +1086,7 @@ abstract final class ModelCatalog {
         sourceUrl: null,
       );
     }
-    return models.first;
+    return models.firstWhere((model) => model.id == 'local-qwen35-08b-q4km');
   }
 }
 

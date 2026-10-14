@@ -1,0 +1,211 @@
+diff --git a/src/llama-model.cpp b/src/llama-model.cpp
+index f896b83..7b35dbd 100644
+--- a/src/llama-model.cpp
++++ b/src/llama-model.cpp
+@@ -1307,6 +1307,9 @@ bool llama_model_base::load_tensors(llama_model_loader & ml) {
+     if (cpu_dev == nullptr) {
+         throw std::runtime_error(format("%s: no CPU backend found", __func__));
+     }
++    if (ggml_backend_buffer_type_t buft = make_alloc_only_buft(cpu_dev)) {
++        pimpl->alloc_only_buft.emplace(cpu_dev, buft);
++    }
+ 
+     // calculate the split points
+     bool all_zero = tensor_split == nullptr || std::all_of(tensor_split, tensor_split + n_devices(), [](float x) { return x == 0.0f; });
+@@ -1708,7 +1711,11 @@ ggml_tensor * llama_model_base::create_tensor_own_alloc(llama_model_loader & ml,
+     // 所以这个改动对现有路径是透明的。
+     ggml_backend_dev_t dev = tn.bid == -1
+         ? nullptr
+-        : ggml_backend_buft_get_device(pimpl->dev_layer.at(tn.bid).buft_list->front().second);
++        : pimpl->dev_layer.at(tn.bid).buft_list->front().first;
++#if defined(__ANDROID__)
++    // Android LES uses host expert slots; Vulkan buffers are not preadv targets.
++    dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++#endif
+ 
+     // 诊断开关：退回「和非专家权重共用一个 buffer」的旧行为，用于 A/B。
+     static const bool disabled = [] {
+@@ -1738,7 +1745,10 @@ ggml_tensor * llama_model_base::create_expert_tensor_from_manifest(llama_model_l
+     // 的文件映射包住（见 create_tensor_own_alloc 的说明）。
+     ggml_backend_dev_t dev = tn.bid == -1
+         ? nullptr
+-        : ggml_backend_buft_get_device(pimpl->dev_layer.at(tn.bid).buft_list->front().second);
++        : pimpl->dev_layer.at(tn.bid).buft_list->front().first;
++#if defined(__ANDROID__)
++    dev = ggml_backend_dev_by_type(GGML_BACKEND_DEVICE_TYPE_CPU);
++#endif
+ 
+     const auto it = dev ? pimpl->alloc_only_buft.find(dev) : pimpl->alloc_only_buft.end();
+     if (it == pimpl->alloc_only_buft.end()) {
+diff --git a/ggml/src/ggml-cpu/ggml-cpu.cpp b/ggml/src/ggml-cpu/ggml-cpu.cpp
+index 128883b..91ccbd6 100644
+--- a/ggml/src/ggml-cpu/ggml-cpu.cpp
++++ b/ggml/src/ggml-cpu/ggml-cpu.cpp
+@@ -9,6 +9,11 @@
+ #include <cctype>
+ #include <string>
+ #include <vector>
++#include <cstring>
++#include <cstdlib>
++#include <limits>
++#include <stdexcept>
++#include <atomic>
+ 
+ #ifdef GGML_USE_CPU_HBM
+ #    include "hbm.h"
+@@ -32,6 +37,11 @@
+ #    include <unistd.h>
+ #endif
+ 
++#ifdef __ANDROID__
++#    include <sys/mman.h>
++#    include <sys/stat.h>
++#endif
++
+ #if defined(__APPLE__)
+ #    include <sys/sysctl.h>
+ #    include <sys/types.h>
+@@ -639,7 +649,143 @@ static ggml_backend_feature * ggml_backend_cpu_get_features(ggml_backend_reg_t r
+     GGML_UNUSED(reg);
+ }
+ 
++// SIQI Android LES port: a distinct host buffer type forces expert slots to
++// own writable memory rather than aliasing the read-only model mmap.
++static const char * ggml_backend_cpu_alloc_only_name(ggml_backend_buffer_type_t buft) {
++    GGML_UNUSED(buft);
++    return "CPU_ExpertSlots";
++}
++
++#ifdef __ANDROID__
++// Opt-in research buffer. MAP_FIXED is permitted ONLY inside this independently
++// reserved arena, never inside malloc memory or a read-only GGUF mapping.
++struct siqi_expert_arena { void * base; size_t length; };
++static std::atomic<uint64_t> siqi_expert_mapped_ranges{0}, siqi_expert_mapped_bytes{0};
++static void siqi_expert_mapping_stats(uint64_t * ranges, uint64_t * bytes) {
++    if (ranges) *ranges = siqi_expert_mapped_ranges.load(std::memory_order_relaxed);
++    if (bytes) *bytes = siqi_expert_mapped_bytes.load(std::memory_order_relaxed);
++}
++
++static size_t siqi_expert_page_size() {
++    const long result = sysconf(_SC_PAGESIZE);
++    return result > 0 ? (size_t) result : 0;
++}
++static size_t siqi_expert_aligned_size(size_t size) {
++    const size_t page = siqi_expert_page_size();
++    if (!page || size > std::numeric_limits<size_t>::max() - page + 1) return 0;
++    return ((size + page - 1) / page) * page;
++}
++static void * siqi_expert_base(ggml_backend_buffer_t buffer) {
++    return static_cast<siqi_expert_arena *>(buffer->context)->base;
++}
++static void siqi_expert_free(ggml_backend_buffer_t buffer) {
++    auto * arena = static_cast<siqi_expert_arena *>(buffer->context);
++    munmap(arena->base, arena->length);
++    delete arena;
++}
++static void siqi_expert_set(ggml_backend_buffer_t, ggml_tensor * tensor,
++        const void * data, size_t offset, size_t length) {
++    memcpy(static_cast<char *>(tensor->data) + offset, data, length);
++}
++static void siqi_expert_get(ggml_backend_buffer_t, const ggml_tensor * tensor,
++        void * data, size_t offset, size_t length) {
++    memcpy(data, static_cast<const char *>(tensor->data) + offset, length);
++}
++static void siqi_expert_memset(ggml_backend_buffer_t, ggml_tensor * tensor,
++        uint8_t value, size_t offset, size_t length) {
++    memset(static_cast<char *>(tensor->data) + offset, value, length);
++}
++static void siqi_expert_clear(ggml_backend_buffer_t buffer, uint8_t value) {
++    auto * arena = static_cast<siqi_expert_arena *>(buffer->context);
++    void * fresh = mmap(arena->base, arena->length, PROT_READ | PROT_WRITE,
++        MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED, -1, 0);
++    if (fresh == MAP_FAILED) throw std::runtime_error("expert-arena-reset-failed");
++    // Anonymous pages already contain zero. Do not fault in gigabytes on reset.
++    if (value) memset(fresh, value, arena->length);
++}
++static ggml_backend_buffer_t siqi_expert_allocate(ggml_backend_buffer_type_t type, size_t size) {
++    const size_t length = siqi_expert_aligned_size(size);
++    if (!length) return nullptr;
++    void * base = mmap(nullptr, length, PROT_READ | PROT_WRITE,
++        MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++    if (base == MAP_FAILED) return nullptr;
++    auto * arena = new (std::nothrow) siqi_expert_arena{base, length};
++    if (!arena) { munmap(base, length); return nullptr; }
++    ggml_backend_buffer_i iface{};
++    iface.free_buffer = siqi_expert_free; iface.get_base = siqi_expert_base;
++    iface.set_tensor = siqi_expert_set; iface.get_tensor = siqi_expert_get;
++    iface.memset_tensor = siqi_expert_memset; iface.clear = siqi_expert_clear;
++    return ggml_backend_buffer_init(type, iface, arena, length);
++}
++static size_t siqi_expert_alignment(ggml_backend_buffer_type_t) { return siqi_expert_page_size(); }
++static size_t siqi_expert_tensor_size(ggml_backend_buffer_type_t, const ggml_tensor * tensor) {
++    return siqi_expert_aligned_size(ggml_nbytes(tensor));
++}
++// Returns false ONLY before mapping. A mapping failure is fatal to this request,
++// since silently falling back to preadv could write into an already read-only slot.
++static bool siqi_expert_map_readonly(ggml_backend_buffer_t buffer, void * address,
++        size_t length, int fd, uint64_t offset, bool validate_only) {
++    if (!buffer || buffer->iface.free_buffer != siqi_expert_free) return false;
++    const auto * arena = static_cast<const siqi_expert_arena *>(buffer->context);
++    const size_t page = siqi_expert_page_size();
++    const uintptr_t start = reinterpret_cast<uintptr_t>(address);
++    const uintptr_t base = reinterpret_cast<uintptr_t>(arena->base);
++    if (!page || !length || start % page || length % page || offset % page ||
++        start < base || start - base > arena->length || length > arena->length - (start - base) ||
++        offset > (uint64_t) std::numeric_limits<off_t>::max() ||
++        length > (uint64_t) std::numeric_limits<off_t>::max() - offset) return false;
++    struct stat info{};
++    if (fstat(fd, &info) || info.st_size < 0 || offset + length > (uint64_t) info.st_size) return false;
++    if (validate_only) return true;
++    void * mapped = mmap(address, length, PROT_READ, MAP_PRIVATE | MAP_FIXED, fd, (off_t) offset);
++    if (mapped == MAP_FAILED || mapped != address) throw std::runtime_error("expert-slot-mmap-failed");
++    madvise(mapped, length, MADV_WILLNEED);
++    // Complete page-in on the I/O worker, not on the later CPU matmul. These
++    // pages are clean/file-backed and reclaimable, unlike copied quant weights.
++    const volatile uint8_t * bytes = static_cast<const volatile uint8_t *>(mapped);
++    uint8_t sink = 0;
++    for (size_t index = 0; index < length; index += page) sink ^= bytes[index];
++    GGML_UNUSED(sink);
++    siqi_expert_mapped_ranges.fetch_add(1, std::memory_order_relaxed);
++    siqi_expert_mapped_bytes.fetch_add(length, std::memory_order_relaxed);
++    return true;
++}
++static const char * siqi_expert_mapped_name(ggml_backend_buffer_type_t) { return "CPU_ExpertSlotsMapped"; }
++#endif
++
++static ggml_backend_buffer_type_t ggml_backend_cpu_alloc_only(size_t index) {
++    if (index != 0) return nullptr;
++    static ggml_backend_buffer_type type = [] {
++        ggml_backend_buffer_type copy = *ggml_backend_cpu_buffer_type();
++        copy.iface.get_name = ggml_backend_cpu_alloc_only_name;
++        copy.device = ggml_backend_reg_dev_get(ggml_backend_cpu_reg(), 0);
++        return copy;
++    }();
++#ifdef __ANDROID__
++    const char * setting = std::getenv("SIQI_MOE_MMAP_SLOTS");
++    if (setting && setting[0] == '1') {
++        static ggml_backend_buffer_type mapped = [] {
++            auto copy = type;
++            copy.iface.get_name = siqi_expert_mapped_name;
++            copy.iface.alloc_buffer = siqi_expert_allocate;
++            copy.iface.get_alignment = siqi_expert_alignment;
++            copy.iface.get_alloc_size = siqi_expert_tensor_size;
++            return copy;
++        }();
++        return &mapped;
++    }
++#endif
++    return &type;
++}
++
+ static void * ggml_backend_cpu_get_proc_address(ggml_backend_reg_t reg, const char * name) {
++#ifdef __ANDROID__
++    if (strcmp(name, "siqi_expert_map_readonly") == 0) return (void *) siqi_expert_map_readonly;
++    if (strcmp(name, "siqi_expert_mapping_stats") == 0) return (void *) siqi_expert_mapping_stats;
++#endif
++    if (strcmp(name, "ggml_backend_dev_buffer_type_alloc_only") == 0) {
++        return (void *) ggml_backend_cpu_alloc_only;
++    }
+     if (strcmp(name, "ggml_backend_set_n_threads") == 0) {
+         ggml_backend_set_n_threads_t fct = ggml_backend_cpu_set_n_threads;
+         return (void *)fct;

@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,6 +17,20 @@ import 'features/startup/startup_failure_app.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  LicenseRegistry.addLicense(() async* {
+    yield LicenseEntryWithLineBreaks([
+      'llama.cpp-omni (optional SIQI LES runtime)',
+    ], await rootBundle.loadString('third_party/llama-omni-LICENSE'));
+    for (final path in [
+      'third_party/kleidiai-NOTICE.txt',
+      'third_party/kleidiai-Apache-2.0.txt',
+      'third_party/kleidiai-BSD-3-Clause.txt',
+    ]) {
+      yield LicenseEntryWithLineBreaks([
+        'KleidiAI (optional SIQI LES runtime)',
+      ], await rootBundle.loadString(path));
+    }
+  });
   final logsFuture = AppLogService.open();
   final preferencesFuture = SharedPreferences.getInstance();
   final databaseFuture = LocalDatabase.open();

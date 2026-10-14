@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/icons/siqi_icons.dart';
@@ -14,10 +16,24 @@ class AppearanceSettingsPage extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final update = ref.read(settingsProvider.notifier).update;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.appearance)),
+      appBar: SiqiPageBar(title: Text(context.l10n.appearance)),
       body: ListView(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
         children: [
+          Card(
+            child: SwitchListTile.adaptive(
+              value: settings.keepScreenAwake,
+              title: Text(context.l10n.keepScreenAwake),
+              subtitle: Text(context.l10n.keepScreenAwakeDescription),
+              secondary: const SiqiIcon(SiqiGlyph.shield),
+              onChanged: (value) async {
+                await update(
+                  (current) => current.copyWith(keepScreenAwake: value),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
           DropdownButtonFormField<AppThemeMode>(
             initialValue: settings.themeMode,
             decoration: InputDecoration(

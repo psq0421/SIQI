@@ -9,6 +9,69 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
+  String get lesExpertCache => 'LES expert cache (original models preserved)';
+
+  @override
+  String get lesTextOnly => 'LES text runtime; vision component not enabled';
+
+  @override
+  String get lesPreparationNotice =>
+      'First use automatically repacks and verifies experts. Extra storage roughly equal to the model size is required; original weights are preserved.';
+
+  @override
+  String get modelRuntimePending =>
+      'Download available; native runtime adaptation pending';
+
+  @override
+  String get keepScreenAwake => 'Keep screen awake in foreground';
+
+  @override
+  String get keepScreenAwakeDescription =>
+      'Enabled by default. Background use follows system screen timeout; may increase battery use.';
+
+  @override
+  String get agentTraces => 'Agent execution traces';
+
+  @override
+  String get agentTraceDescription =>
+      'Local steps, results and termination reasons. Export JSON for reproducible evaluation.';
+
+  @override
+  String get exportAgentTrace => 'Export Agent trace';
+
+  @override
+  String get exportFailedAgentTrace => 'Export failure log';
+
+  @override
+  String get tracePrivacyWarning =>
+      'Logs can contain your instructions, code and tool output. Common credentials are masked, but review the file before sharing.';
+
+  @override
+  String get traceDelete => 'Delete this trace';
+
+  @override
+  String get traceEmpty => 'No Agent execution traces yet';
+
+  @override
+  String get traceInterrupted => 'Interrupted by app restart';
+
+  @override
+  String get traceExportFailed => 'Could not export the trace. Please retry.';
+
+  @override
+  String get releaseActiveModel => 'Release active model';
+
+  @override
+  String get releaseActiveModelDescription =>
+      'Stop generation and release native model memory.';
+
+  @override
+  String get modelMemoryReleased => 'Model memory released';
+
+  @override
+  String get runtimeSpillCache => 'Runtime spill cache';
+
+  @override
   String get lanGateway => 'LAN gateway';
 
   @override
@@ -61,6 +124,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get benchmarkTitle => 'Performance lab';
 
   @override
+  String get benchmarkContextNote =>
+      'The window is allocated capacity only. Choose a real document and check actual input tokens; a short prompt does not test long context. Document contents are not logged.';
+
+  @override
+  String get benchmarkReuseModel => 'Keep the loaded model for warm testing';
+
+  @override
+  String get benchmarkReuseModelNote =>
+      'When off, unload before loading. File caches are not flushed. Actual reuse is recorded in the result.';
+
+  @override
+  String get benchmarkPickDocument =>
+      'Choose a real document for long-input testing';
+
+  @override
+  String get benchmarkResetDocument => 'Restore the built-in short-text test';
+
+  @override
   String get benchmarkWarning =>
       'Experiments load large models and consume power. Keep ventilation; stop on severe system heat. Results do not imply 5 t/s has been achieved.';
 
@@ -88,6 +169,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get benchmarkRunning => 'Running controlled experiment…';
+
+  @override
+  String benchmarkPrefillProgress(int evaluated, int total) {
+    return 'Processing real input: $evaluated / $total tokens. Decode measurement starts only after full prefill.';
+  }
+
+  @override
+  String benchmarkThreadSweepProgress(int completed, int total) {
+    return 'Same-state thread comparison: $completed / $total. All profiles are recorded; the highest score is not selected automatically.';
+  }
+
+  @override
+  String get benchmarkBusy =>
+      'Inference or a benchmark is already running. Wait for it to finish and try again.';
 
   @override
   String get benchmarkDescription =>

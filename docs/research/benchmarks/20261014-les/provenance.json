@@ -1,0 +1,35 @@
+{
+    "schema":  1,
+    "capturedUtc":  "2026-10-14T03:22:52.3769761Z",
+    "deviceId":  "sm8475-reference-01",
+    "runtimeRevision":  "0b74404c9b3dfe2c6b11aebe0dd58fc23f133ee2",
+    "appHead":  "8a62baab2f6ae53c5329af960ac6671053e9526f",
+    "workingTreeDirty":  true,
+    "relevantSourceHashes":  [
+                                 {
+                                     "sha256":  "7b9af6aa9d6cc8fa72ec2d7f79969be8d2f61ea66d9cbbdc6c3d720fa4a19660",
+                                     "path":  "tools/native/minicpm_cpu_probe/main.cpp"
+                                 },
+                                 {
+                                     "sha256":  "94de5e8ea0ceb351fe6497808b65cdc67dc73c7ee85e22cb83aa394f66c260a8",
+                                     "path":  "tools/native/minicpm_cpu_probe/les_runtime.cpp"
+                                 },
+                                 {
+                                     "sha256":  "18aa75b68e8fff6faadfc9ae69bd66e96275e13a9f139bc13a6684ad87c790a0",
+                                     "path":  "tools/native/minicpm_cpu_probe/CMakeLists.txt"
+                                 },
+                                 {
+                                     "sha256":  "3c7edbd74b0b770f37b2d3d5ea511c78431ae6ff2c30b4b8fac08f67a21d95f6",
+                                     "path":  "tools/native/patches/android-les-io.patch"
+                                 },
+                                 {
+                                     "sha256":  "eef6d1643f566939c57e7febc45e48b875db2cb6ab47fed4bc6fa00ae4444ccb",
+                                     "path":  "tools/native/patches/cpu-expert-slots.patch"
+                                 },
+                                 {
+                                     "sha256":  "49cd2d1652025090a40e32933833a1207ecb902a24a0465c4f57c100fa3e2280",
+                                     "path":  "tools/native/patches/vulkan-driver-failure.patch"
+                                 }
+                             ],
+    "note":  "Historical pre-publication capture. The USB serial was replaced with a reference-device label for public release; measurements and source hashes are unchanged. Each app record pins its measured APK, which may predate the final release."
+}

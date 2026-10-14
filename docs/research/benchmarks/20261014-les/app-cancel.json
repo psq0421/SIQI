@@ -1,0 +1,57 @@
+{
+    "capture":  "Release performance page accessibility tree; per-sample JSONL not attached",
+    "apkSha256":  "C243E3B266256895255437E343A2588422A57838AA643E66F40DB285C93F54B6",
+    "record":  {
+                   "schema":  2,
+                   "event":  "completed",
+                   "runId":  "1791947526182728",
+                   "at":  "2026-10-14T11:12:06.182728",
+                   "modelId":  "local-minicpmv47-35b-mixq3",
+                   "promptId":  "robot-tree-en-v1",
+                   "promptSha256":  "0409925e4aa7c3c2040e526277071b4116fde3dcf1a8726aa802a327969e6e33",
+                   "reuseModelRequested":  true,
+                   "profile":  "LES / CPU 4 / Q4 KV / batch64 / micro8",
+                   "runtimeProfile":  "minicpm-v47-35b-les",
+                   "quantization":  "mix_q3gud_im",
+                   "modelSha256":  "51e32201f0ddaf87dbb9689ceef9e3aa1a1543a1366706aa2abbf3aabb34df6b",
+                   "device":  {
+                                  "socModel":  "SM8475",
+                                  "androidSdk":  37,
+                                  "processorCount":  8,
+                                  "ramBytes":  11706544128,
+                                  "swapTotalBytes":  12884897792,
+                                  "swapFreeBytes":  6976573440
+                              },
+                   "requestedContext":  2048,
+                   "requestedOutput":  256,
+                   "performance":  {
+                                       "modelId":  "local-minicpmv47-35b-mixq3",
+                                       "requestedContext":  2048,
+                                       "effectiveContext":  2048,
+                                       "runtimeProfile":  "minicpm-v47-35b-les",
+                                       "memoryBudgetBytes":  5000000000,
+                                       "status":  "cancelled",
+                                       "failureStage":  "request",
+                                       "terminationReason":  "LocalInferenceCancelledException",
+                                       "requestStartedAt":  "2026-10-14T03:12:06.836260Z",
+                                       "sampledPeakRssBytes":  4913004544,
+                                       "rssSamples":  11
+                                   },
+                   "error":  "Instance of \u0027LocalInferenceCancelledException\u0027",
+                   "memoryAcceptance":  {
+                                            "schemaVersion":  1,
+                                            "scope":  "sampled-whole-app-process-peak-for-this-run",
+                                            "targetBytes":  5000000000,
+                                            "peakRssBytes":  4758274048,
+                                            "peakPssBytes":  4808885248,
+                                            "rssSamples":  6,
+                                            "pssSamples":  6,
+                                            "completed":  false,
+                                            "requestedContext":  2048,
+                                            "effectiveContext":  2048,
+                                            "contextTargetMet":  true,
+                                            "verdict":  "inconclusive",
+                                            "limitation":  "Sampling can miss transient peaks. A passing run does not validate other contexts, image inputs, or long conversations."
+                                        }
+               }
+}

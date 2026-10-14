@@ -14,6 +14,7 @@ import 'notification_service.dart';
 import 'permission_service.dart';
 import 'platform_service.dart';
 import 'resource_planner.dart';
+import 'minicpm_les_backend.dart';
 
 class ModelDownloadService {
   ModelDownloadService(
@@ -99,6 +100,7 @@ class ModelDownloadService {
         await directory.delete();
       }
     }
+    removedBytes += await MiniCpmLesBackend.removeModelCache(modelId);
     await _database.deleteDownloadedModelRecords(modelId);
     _verificationCache.clear();
     await _database.addWorkLog(

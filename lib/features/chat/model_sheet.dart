@@ -45,7 +45,7 @@ class ModelSheet extends ConsumerWidget {
               context.l10n.chooseModel,
               style: Theme.of(
                 context,
-              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
+              ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w500),
             ),
             const SizedBox(height: 18),
             _SectionTitle(
@@ -211,7 +211,7 @@ class _SectionTitle extends StatelessWidget {
           title,
           style: Theme.of(
             context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w500),
         ),
       ],
     ),

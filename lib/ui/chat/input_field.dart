@@ -44,7 +44,7 @@ class ChatInputField extends StatelessWidget {
   Widget build(BuildContext context) => SafeArea(
     top: false,
     child: Padding(
-      padding: const EdgeInsets.fromLTRB(10, 5, 10, 10),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -67,8 +67,19 @@ class ChatInputField extends StatelessWidget {
                     .toList(),
               ),
             ),
+          TextField(
+            controller: controller,
+            minLines: 1,
+            maxLines: 6,
+            textInputAction: TextInputAction.newline,
+            decoration: InputDecoration(
+              hintText: recording
+                  ? context.l10n.recordingInProgress
+                  : context.l10n.messageHint,
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               IconButton(
                 tooltip: context.l10n.attach,
@@ -102,25 +113,15 @@ class ChatInputField extends StatelessWidget {
                     : const SiqiIcon(SiqiGlyph.image),
               ),
               IconButton(
-                tooltip: context.l10n.screenshotOcr,
+                tooltip: context.l10n.permissionCamera,
                 onPressed: sending || recognizingImage ? null : onCamera,
                 icon: const Icon(Icons.camera_alt_rounded),
               ),
-              Expanded(
-                child: TextField(
-                  controller: controller,
-                  minLines: 1,
-                  maxLines: 6,
-                  textInputAction: TextInputAction.newline,
-                  decoration: InputDecoration(
-                    hintText: recording
-                        ? context.l10n.recordingInProgress
-                        : context.l10n.messageHint,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 6),
+              const Spacer(),
               IconButton.filled(
+                style: IconButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.primary,
+                ),
                 tooltip: sending ? context.l10n.stop : context.l10n.send,
                 onPressed: sending
                     ? (cancelling ? null : onStop)

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,7 +25,7 @@ class MultimodalPage extends ConsumerWidget {
         )
         .toList();
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.multimodalZone)),
+      appBar: SiqiPageBar(title: Text(context.l10n.multimodalZone)),
       body: FutureBuilder<DeviceMemoryInfo>(
         future: ref.read(platformServiceProvider).deviceMemory(),
         builder: (context, snapshot) {

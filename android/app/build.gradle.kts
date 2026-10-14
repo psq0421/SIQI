@@ -40,6 +40,19 @@ android {
             // produced much larger APKs with an incomplete offline feature set.
             abiFilters += "arm64-v8a"
         }
+        externalNativeBuild {
+            cmake {
+                val lesSource = providers.gradleProperty("siqiLesSource").orNull
+                    ?: providers.environmentVariable("SIQI_LES_SOURCE").orNull
+                if (lesSource != null) {
+                    arguments += "-DSIQI_LES_SOURCE=$lesSource"
+                }
+                val kleidiSource = providers.environmentVariable("SIQI_KLEIDIAI_SOURCE").orNull
+                if (kleidiSource != null) {
+                    arguments += "-DFETCHCONTENT_SOURCE_DIR_KLEIDIAI_DOWNLOAD=$kleidiSource"
+                }
+            }
+        }
     }
 
     packaging {

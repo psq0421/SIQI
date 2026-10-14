@@ -1,7 +1,7 @@
 name: siqi
 description: A local-first AI workstation for Android.
 publish_to: none
-version: 1.0.0-beta.3+4200
+version: 1.0.0-beta.4+4300
 
 environment:
   sdk: '>=3.10.7 <4.0.0'
@@ -32,6 +32,7 @@ dependencies:
   mime: ^2.0.0
   image: ^4.5.4
   collection: ^1.19.1
+  ffi: ^2.2.0
   html: ^0.15.6
   mcp_dart: ^2.4.1
   sherpa_onnx: ^1.13.6
@@ -39,6 +40,11 @@ dependencies:
   audioplayers: ^6.8.1
 
 dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  sqflite_common_ffi: 2.3.6
+  # Windows FFI 2.3.6 uses sqlite3/open.dart, removed by sqlite3 3.x.
+  sqlite3: ^2.9.4
   flutter_lints: ^5.0.0
 
 dependency_overrides:
@@ -51,6 +57,10 @@ flutter:
   generate: true
   assets:
     - assets/branding/siqi_brand.jpg
+    - third_party/llama-omni-LICENSE
+    - third_party/kleidiai-Apache-2.0.txt
+    - third_party/kleidiai-BSD-3-Clause.txt
+    - third_party/kleidiai-NOTICE.txt
 
 hooks:
   user_defines:

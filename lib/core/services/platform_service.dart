@@ -85,6 +85,7 @@ class DeviceRuntimeInfo {
   final int armVersion;
   final bool armV9Candidate;
   final bool hexagonDevice;
+
   /// True only when a readable Qualcomm/Hexagon runtime library was found.
   /// This still does not prove that the current model uses the NPU.
   final bool hexagonNpuRuntime;
@@ -166,6 +167,12 @@ class PlatformService {
 
   Future<bool> setCpuAffinity(List<int> cores) async =>
       await _channel.invokeMethod<bool>('setCpuAffinity', {'cores': cores}) ??
+      false;
+
+  Future<bool> setKeepScreenOn(bool enabled) async =>
+      await _channel.invokeMethod<bool>('setKeepScreenOn', {
+        'enabled': enabled,
+      }) ??
       false;
 
   Future<ProcessStats> processStats() async {

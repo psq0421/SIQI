@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -10,21 +12,27 @@ class LocalDatabase {
   LocalDatabase._(this._database);
   final Database _database;
 
-  static Future<LocalDatabase> open() async {
-    final root = await getDatabasesPath();
-    final database = await openDatabase(
-      p.join(root, AppConstants.databaseName),
-      version: AppConstants.databaseVersion,
-      onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
-      onUpgrade: (db, oldVersion, newVersion) async {
-        if (oldVersion < 2) await _createHarnessPluginTable(db);
-        if (oldVersion < 3) await _createOperationalTables(db);
-        if (oldVersion < 4) await _createAlpha2Tables(db);
-        if (oldVersion < 5) await _upgradeApiProfilesForAlpha3(db);
-        if (oldVersion < 6) await _upgradeApiProfilesForReasoning(db);
-      },
-      onCreate: (db, version) async {
-        await db.execute('''
+  static Future<LocalDatabase> open({
+    String? path,
+    DatabaseFactory? factory,
+  }) async {
+    final resolvedPath =
+        path ?? p.join(await getDatabasesPath(), AppConstants.databaseName);
+    final database = await (factory ?? databaseFactory).openDatabase(
+      resolvedPath,
+      options: OpenDatabaseOptions(
+        version: AppConstants.databaseVersion,
+        onConfigure: (db) => db.execute('PRAGMA foreign_keys = ON'),
+        onUpgrade: (db, oldVersion, newVersion) async {
+          if (oldVersion < 2) await _createHarnessPluginTable(db);
+          if (oldVersion < 3) await _createOperationalTables(db);
+          if (oldVersion < 4) await _createAlpha2Tables(db);
+          if (oldVersion < 5) await _upgradeApiProfilesForAlpha3(db);
+          if (oldVersion < 6) await _upgradeApiProfilesForReasoning(db);
+          if (oldVersion < 7) await _createAgentTraceTable(db);
+        },
+        onCreate: (db, version) async {
+          await db.execute('''
           CREATE TABLE sessions(
             id TEXT PRIMARY KEY,
             title TEXT NOT NULL,
@@ -32,7 +40,7 @@ class LocalDatabase {
             updated_at INTEGER NOT NULL
           )
         ''');
-        await db.execute('''
+          await db.execute('''
           CREATE TABLE messages(
             id TEXT PRIMARY KEY,
             session_id TEXT NOT NULL,
@@ -44,10 +52,10 @@ class LocalDatabase {
             FOREIGN KEY(session_id) REFERENCES sessions(id) ON DELETE CASCADE
           )
         ''');
-        await db.execute(
-          'CREATE INDEX idx_messages_session ON messages(session_id, created_at)',
-        );
-        await db.execute('''
+          await db.execute(
+            'CREATE INDEX idx_messages_session ON messages(session_id, created_at)',
+          );
+          await db.execute('''
           CREATE TABLE api_profiles(
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -70,7 +78,7 @@ class LocalDatabase {
             estimated_cost REAL NOT NULL DEFAULT 0
           )
         ''');
-        await db.execute('''
+          await db.execute('''
           CREATE TABLE model_downloads(
             model_id TEXT PRIMARY KEY,
             file_path TEXT NOT NULL,
@@ -79,7 +87,7 @@ class LocalDatabase {
             completed_at INTEGER NOT NULL
           )
         ''');
-        await db.execute('''
+          await db.execute('''
           CREATE TABLE mcp_servers(
             id TEXT PRIMARY KEY,
             name TEXT NOT NULL,
@@ -89,7 +97,7 @@ class LocalDatabase {
             enabled INTEGER NOT NULL DEFAULT 1
           )
         ''');
-        await db.execute('''
+          await db.execute('''
           CREATE TABLE shell_history(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             command TEXT NOT NULL,
@@ -97,12 +105,16 @@ class LocalDatabase {
             created_at INTEGER NOT NULL
           )
         ''');
-        await _createHarnessPluginTable(db);
-        await _createOperationalTables(db);
-        await _createAlpha2Tables(db);
-      },
+          await _createHarnessPluginTable(db);
+          await _createOperationalTables(db);
+          await _createAlpha2Tables(db);
+          await _createAgentTraceTable(db);
+        },
+      ),
     );
-    return LocalDatabase._(database);
+    final local = LocalDatabase._(database);
+    await local._recoverInterruptedAgentExecutions();
+    return local;
   }
 
   static Future<void> _createHarnessPluginTable(Database db) async {
@@ -281,7 +293,9 @@ class LocalDatabase {
         session_id TEXT,
         workspace_path TEXT NOT NULL,
         summary TEXT NOT NULL,
+        input_instruction TEXT NOT NULL DEFAULT '',
         status TEXT NOT NULL,
+        termination_reason TEXT,
         started_at INTEGER NOT NULL,
         completed_at INTEGER
       )
@@ -298,6 +312,47 @@ class LocalDatabase {
         FOREIGN KEY(execution_id) REFERENCES agent_executions(id) ON DELETE CASCADE
       )
     ''');
+  }
+
+  static Future<void> _createAgentTraceTable(Database db) async {
+    await _addColumnIfMissing(
+      db,
+      'agent_executions',
+      'input_instruction',
+      "TEXT NOT NULL DEFAULT ''",
+    );
+    await _addColumnIfMissing(
+      db,
+      'agent_executions',
+      'termination_reason',
+      'TEXT',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS agent_execution_events(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        execution_id TEXT NOT NULL,
+        sequence_no INTEGER NOT NULL,
+        event_type TEXT NOT NULL,
+        action_id TEXT,
+        payload_json TEXT NOT NULL,
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY(execution_id) REFERENCES agent_executions(id) ON DELETE CASCADE
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_agent_trace_execution ON agent_execution_events(execution_id, sequence_no)',
+    );
+  }
+
+  static Future<void> _addColumnIfMissing(
+    Database db,
+    String table,
+    String column,
+    String definition,
+  ) async {
+    final columns = await db.rawQuery('PRAGMA table_info($table)');
+    if (columns.any((row) => row['name'] == column)) return;
+    await db.execute('ALTER TABLE $table ADD COLUMN $column $definition');
   }
 
   Future<List<ChatSession>> listSessions({String query = ''}) async {
@@ -479,15 +534,180 @@ class LocalDatabase {
     required String id,
     required String workspacePath,
     required String summary,
+    String inputInstruction = '',
+    String? sessionId,
   }) => _database.insert('agent_executions', {
     'id': id,
-    'session_id': null,
+    'session_id': sessionId,
     'workspace_path': workspacePath,
     'summary': summary,
+    'input_instruction': inputInstruction,
     'status': 'running',
+    'termination_reason': null,
     'started_at': DateTime.now().millisecondsSinceEpoch,
     'completed_at': null,
   });
+
+  Future<void> recordAgentEvent({
+    required String executionId,
+    required int sequenceNo,
+    required String eventType,
+    String? actionId,
+    required Map<String, Object?> payload,
+  }) => _database.insert('agent_execution_events', {
+    'execution_id': executionId,
+    'sequence_no': sequenceNo,
+    'event_type': eventType,
+    'action_id': actionId,
+    'payload_json': jsonEncode(payload),
+    'created_at': DateTime.now().millisecondsSinceEpoch,
+  });
+
+  Future<List<Map<String, Object?>>> listAgentEvents(String executionId) =>
+      _database.query(
+        'agent_execution_events',
+        where: 'execution_id = ?',
+        whereArgs: [executionId],
+        orderBy: 'sequence_no ASC',
+      );
+
+  Future<void> appendAgentEvent({
+    required String executionId,
+    required String eventType,
+    String? actionId,
+    required Map<String, Object?> payload,
+  }) => _database.transaction((txn) async {
+    final rows = await txn.rawQuery(
+      'SELECT COALESCE(MAX(sequence_no), -1) + 1 AS next_seq '
+      'FROM agent_execution_events WHERE execution_id = ?',
+      [executionId],
+    );
+    await txn.insert('agent_execution_events', {
+      'execution_id': executionId,
+      'sequence_no': rows.first['next_seq'],
+      'event_type': eventType,
+      'action_id': actionId,
+      'payload_json': jsonEncode(payload),
+      'created_at': DateTime.now().millisecondsSinceEpoch,
+    });
+  });
+
+  Future<void> setAgentExecutionStatus(String id, String status) =>
+      _database.update(
+        'agent_executions',
+        {'status': status},
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+
+  Future<void> deleteAgentExecution(String id) =>
+      _database.delete('agent_executions', where: 'id = ?', whereArgs: [id]);
+
+  Future<void> _recoverInterruptedAgentExecutions() async {
+    final rows = await _database.query(
+      'agent_executions',
+      where: 'status IN (?, ?)',
+      whereArgs: ['running', 'awaiting_approval'],
+    );
+    for (final row in rows) {
+      final id = row['id'] as String;
+      await appendAgentEvent(
+        executionId: id,
+        eventType: 'task_interrupted',
+        payload: {
+          'terminationReason': 'app_restart',
+          'previousStatus': row['status'],
+        },
+      );
+      await completeAgentExecution(
+        id,
+        'interrupted',
+        terminationReason: 'app_restart',
+      );
+    }
+  }
+
+  Future<Map<String, Object?>?> agentExecution(String executionId) async {
+    final rows = await _database.query(
+      'agent_executions',
+      where: 'id = ?',
+      whereArgs: [executionId],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<List<Map<String, Object?>>> listAgentExecutions({int limit = 50}) =>
+      _database.query(
+        'agent_executions',
+        orderBy: 'started_at DESC',
+        limit: limit,
+      );
+
+  Future<Map<String, Object?>?> exportAgentExecution(String executionId) async {
+    final execution = await agentExecution(executionId);
+    if (execution == null) return null;
+    final events = await listAgentEvents(executionId);
+    final decodedEvents = <Map<String, Object?>>[];
+    for (final event in events) {
+      final raw = event['payload_json'] as String? ?? '{}';
+      Map<String, dynamic> payload;
+      try {
+        payload = Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      } on Object {
+        payload = {'raw': raw};
+      }
+      decodedEvents.add({
+        'sequence': event['sequence_no'],
+        'type': event['event_type'],
+        'actionId': event['action_id'],
+        'createdAt': event['created_at'],
+        'payload': payload,
+      });
+    }
+    return {
+      'schemaVersion': 1,
+      'executionId': executionId,
+      'inputInstruction': execution['input_instruction'],
+      'sessionId': execution['session_id'],
+      'workspacePath': execution['workspace_path'],
+      'summary': execution['summary'],
+      'status': execution['status'],
+      'terminationReason': execution['termination_reason'],
+      'startedAt': execution['started_at'],
+      'completedAt': execution['completed_at'],
+      'events': decodedEvents,
+    };
+  }
+
+  /// Exports a bounded, ordered set of complete Agent traces for research
+  /// review. Payloads were redacted at write time; this method never reads
+  /// chat history or API secrets.
+  Future<List<Map<String, Object?>>> exportAgentExecutions({
+    int limit = 100,
+    bool failedOnly = false,
+  }) async {
+    final executions = await _database.query(
+      'agent_executions',
+      where: failedOnly ? 'status IN (?, ?, ?)' : null,
+      whereArgs: failedOnly ? ['failed', 'interrupted', 'cancelled'] : null,
+      orderBy: 'started_at DESC',
+      limit: limit.clamp(1, 1000),
+    );
+    final traces = <Map<String, Object?>>[];
+    for (final execution in executions) {
+      final status = execution['status'] as String? ?? '';
+      if (failedOnly &&
+          !{'failed', 'interrupted', 'cancelled'}.contains(status)) {
+        continue;
+      }
+      final id = execution['id'] as String?;
+      if (id == null) continue;
+      final trace = await exportAgentExecution(id);
+      if (trace != null) traces.add(trace);
+    }
+    return traces;
+  }
 
   Future<void> saveWorkspaceSnapshot({
     required String id,
@@ -506,16 +726,20 @@ class LocalDatabase {
     'created_at': DateTime.now().millisecondsSinceEpoch,
   }, conflictAlgorithm: ConflictAlgorithm.replace);
 
-  Future<void> completeAgentExecution(String id, String status) =>
-      _database.update(
-        'agent_executions',
-        {
-          'status': status,
-          'completed_at': DateTime.now().millisecondsSinceEpoch,
-        },
-        where: 'id = ?',
-        whereArgs: [id],
-      );
+  Future<void> completeAgentExecution(
+    String id,
+    String status, {
+    String? terminationReason,
+  }) => _database.update(
+    'agent_executions',
+    {
+      'status': status,
+      'termination_reason': terminationReason,
+      'completed_at': DateTime.now().millisecondsSinceEpoch,
+    },
+    where: 'id = ?',
+    whereArgs: [id],
+  );
 
   Future<List<Map<String, Object?>>> workspaceSnapshots(String executionId) =>
       _database.query(
@@ -834,6 +1058,7 @@ class LocalDatabase {
     'tool_approvals': await _database.query('tool_approvals'),
     'agent_executions': await _database.query('agent_executions'),
     'workspace_snapshots': await _database.query('workspace_snapshots'),
+    'agent_execution_events': await _database.query('agent_execution_events'),
   };
 
   Future<void> importSnapshot(Map<String, dynamic> snapshot) async {
@@ -856,6 +1081,7 @@ class LocalDatabase {
         'tool_approvals',
         'agent_executions',
         'workspace_snapshots',
+        'agent_execution_events',
       ]) {
         final rows = (snapshot[table] as List? ?? const []).cast<Map>();
         for (final row in rows) {

@@ -101,6 +101,120 @@ abstract class AppLocalizations {
     Locale('zh', 'TW'),
   ];
 
+  /// No description provided for @lesExpertCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'LES 专家缓存（清除不会删除原始模型）'**
+  String get lesExpertCache;
+
+  /// No description provided for @lesTextOnly.
+  ///
+  /// In zh, this message translates to:
+  /// **'LES 文本运行时；视觉组件尚未启用'**
+  String get lesTextOnly;
+
+  /// No description provided for @lesPreparationNotice.
+  ///
+  /// In zh, this message translates to:
+  /// **'首次运行将自动重排并校验专家，需要额外约一份模型大小的本地存储；原始模型不会修改。'**
+  String get lesPreparationNotice;
+
+  /// No description provided for @modelRuntimePending.
+  ///
+  /// In zh, this message translates to:
+  /// **'可下载管理；专用运行时适配中'**
+  String get modelRuntimePending;
+
+  /// No description provided for @keepScreenAwake.
+  ///
+  /// In zh, this message translates to:
+  /// **'前台保持屏幕常亮'**
+  String get keepScreenAwake;
+
+  /// No description provided for @keepScreenAwakeDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'默认开启。切到后台后遵循系统息屏设置；开启可能增加耗电。'**
+  String get keepScreenAwakeDescription;
+
+  /// No description provided for @agentTraces.
+  ///
+  /// In zh, this message translates to:
+  /// **'Agent 执行轨迹'**
+  String get agentTraces;
+
+  /// No description provided for @agentTraceDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'本地记录步骤、结果与终止原因，导出 JSON 用于复现和评测。'**
+  String get agentTraceDescription;
+
+  /// No description provided for @exportAgentTrace.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出 Agent 轨迹'**
+  String get exportAgentTrace;
+
+  /// No description provided for @exportFailedAgentTrace.
+  ///
+  /// In zh, this message translates to:
+  /// **'导出失败日志'**
+  String get exportFailedAgentTrace;
+
+  /// No description provided for @tracePrivacyWarning.
+  ///
+  /// In zh, this message translates to:
+  /// **'日志可能包含你的指令、代码与工具输出。常见密钥已脱敏，但分享前仍请检查内容。'**
+  String get tracePrivacyWarning;
+
+  /// No description provided for @traceDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除此轨迹'**
+  String get traceDelete;
+
+  /// No description provided for @traceEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无 Agent 执行轨迹'**
+  String get traceEmpty;
+
+  /// No description provided for @traceInterrupted.
+  ///
+  /// In zh, this message translates to:
+  /// **'应用重启导致中断'**
+  String get traceInterrupted;
+
+  /// No description provided for @traceExportFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'无法导出轨迹，请重试。'**
+  String get traceExportFailed;
+
+  /// No description provided for @releaseActiveModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'释放正在运行的模型'**
+  String get releaseActiveModel;
+
+  /// No description provided for @releaseActiveModelDescription.
+  ///
+  /// In zh, this message translates to:
+  /// **'停止生成并释放原生模型内存。'**
+  String get releaseActiveModelDescription;
+
+  /// No description provided for @modelMemoryReleased.
+  ///
+  /// In zh, this message translates to:
+  /// **'模型内存已释放'**
+  String get modelMemoryReleased;
+
+  /// No description provided for @runtimeSpillCache.
+  ///
+  /// In zh, this message translates to:
+  /// **'推理临时缓存'**
+  String get runtimeSpillCache;
+
   /// No description provided for @lanGateway.
   ///
   /// In zh, this message translates to:
@@ -197,6 +311,36 @@ abstract class AppLocalizations {
   /// **'性能实验'**
   String get benchmarkTitle;
 
+  /// No description provided for @benchmarkContextNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'窗口大小只是申请容量。请选择真实文档并查看实际输入 token 数；短提示词不能验证长上下文。日志不保存文档正文。'**
+  String get benchmarkContextNote;
+
+  /// No description provided for @benchmarkReuseModel.
+  ///
+  /// In zh, this message translates to:
+  /// **'保留已加载模型进行热测试'**
+  String get benchmarkReuseModel;
+
+  /// No description provided for @benchmarkReuseModelNote.
+  ///
+  /// In zh, this message translates to:
+  /// **'关闭时先释放模型再加载；文件缓存不由应用清空。实际复用情况写入结果。'**
+  String get benchmarkReuseModelNote;
+
+  /// No description provided for @benchmarkPickDocument.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择真实文档测试长输入'**
+  String get benchmarkPickDocument;
+
+  /// No description provided for @benchmarkResetDocument.
+  ///
+  /// In zh, this message translates to:
+  /// **'恢复内置短文本测试'**
+  String get benchmarkResetDocument;
+
   /// No description provided for @benchmarkWarning.
   ///
   /// In zh, this message translates to:
@@ -250,6 +394,24 @@ abstract class AppLocalizations {
   /// In zh, this message translates to:
   /// **'正在运行受控实验…'**
   String get benchmarkRunning;
+
+  /// No description provided for @benchmarkPrefillProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'正在处理真实输入：{evaluated} / {total} tokens。预填充完成后才开始测量解码速度。'**
+  String benchmarkPrefillProgress(int evaluated, int total);
+
+  /// No description provided for @benchmarkThreadSweepProgress.
+  ///
+  /// In zh, this message translates to:
+  /// **'同一输入状态线程对比：{completed} / {total}。结果包含全部配置，不自动选取最高成绩。'**
+  String benchmarkThreadSweepProgress(int completed, int total);
+
+  /// No description provided for @benchmarkBusy.
+  ///
+  /// In zh, this message translates to:
+  /// **'已有推理或性能实验在运行，请等待结束后重试。'**
+  String get benchmarkBusy;
 
   /// No description provided for @benchmarkDescription.
   ///

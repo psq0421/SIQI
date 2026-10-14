@@ -47,14 +47,17 @@ class _OnboardingPageState extends ConsumerState<OnboardingPage> {
       );
       return;
     }
-    final localizations = context.l10n;
     await ref
         .read(settingsProvider.notifier)
         .update(
           (current) => current.copyWith(
             onboardingComplete: true,
             userName: _nameController.text.trim(),
-            systemPrompt: localizations.defaultSystemPrompt,
+            // Keep the onboarding default in one source of truth.  The
+            // localized short label is for display only; using it here used
+            // to silently discard the safety, workspace and verification
+            // rules in AppSettings.defaultSystemPrompt.
+            systemPrompt: AppSettings.defaultSystemPrompt,
           ),
         );
   }

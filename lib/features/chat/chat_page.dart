@@ -28,6 +28,7 @@ class ChatPage extends ConsumerStatefulWidget {
 class _ChatPageState extends ConsumerState<ChatPage> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
+  String? _lastRenderedSessionId;
   bool _recording = false;
   bool _transcribing = false;
   bool _recognizingImage = false;
@@ -70,10 +71,23 @@ class _ChatPageState extends ConsumerState<ChatPage> {
     });
   }
 
+  void _scrollToEndAfterSessionLoad(String? sessionId) {
+    if (sessionId == _lastRenderedSessionId) return;
+    _lastRenderedSessionId = sessionId;
+    // Selecting a history entry updates the provider before this list has
+    // laid out. Schedule the jump after the new message list is attached so
+    // opening a long conversation starts at its latest message.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final chat = ref.watch(chatProvider);
     final settings = ref.watch(settingsProvider);
+    _scrollToEndAfterSessionLoad(chat.currentSession?.id);
     final modelInfo = _modelInfo(settings.selectedModelId, chat.profiles);
     final errorText = _errorText(context, chat.errorCode, chat.errorDetail);
     if (chat.sending && chat.partialResponse.isNotEmpty) _scrollToEnd();
@@ -678,7 +692,7 @@ class _EmptyConversation extends StatelessWidget {
               Text(
                 context.l10n.chatWelcomeTitle,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
               const SizedBox(height: 7),
@@ -782,7 +796,7 @@ class _MessageBubble extends StatelessWidget {
                   Text(
                     isUser ? context.l10n.roleYou : context.l10n.appName,
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                 ],
@@ -935,7 +949,7 @@ class _AgentApprovalPanel extends ConsumerWidget {
                             Text(
                               envelope.steps[index].title,
                               style: const TextStyle(
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
                             Text(
@@ -1128,7 +1142,7 @@ class _AgentActionTile extends StatelessWidget {
               Expanded(
                 child: Text(
                   _actionName(context, action.type),
-                  style: const TextStyle(fontWeight: FontWeight.w800),
+                  style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
               ),
               if (success != null)

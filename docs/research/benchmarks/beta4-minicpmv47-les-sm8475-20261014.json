@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "scope": "standalone Android CPU LES probe; not whole-app acceptance",
+  "date": "2026-10-14",
+  "device": {"serial": "57e2a7e4", "soc": "SM8475", "androidSdk": 37, "ramBytes": 11706544128},
+  "modelArtifact": {"model": "MiniCPM-V-4.7-35B-A3B-mix_q3gud_im.gguf", "sourceBytes": 15503944896, "expertBytes": 13841203200, "expertTensors": 120, "layers": 40},
+  "runtime": {"revision": "0b74404c9b3dfe2c6b11aebe0dd58fc23f133ee2", "patches": ["android-f-nocache", "cpu-expert-slots"], "prefillSlots": 64, "decodeWindow": 12, "threads": 4},
+  "workload": {"promptId": "synthetic-chatml-no-think-v1", "requestedContext": 2048, "outputTokens": 8, "cpuMask": "f0"},
+  "result": {"status": "completed", "decodeTokensPerSecond": 0.042816008905729855, "decodeWallMs": 186846, "sampledRunPeakRss": 2197594112, "prefillEvalTokens": 7, "syntheticOutput": "Hello! The sky appears blue because of"},
+  "verdict": "failed",
+  "limitations": ["standalone process, not the Flutter whole-app RSS", "one short run", "no visual projector", "2K context only", "no GPU/NPU backend"],
+  "notes": "The experiment proves byte-exact expert packing/verification and a complete text decode path, but UFS expert I/O and CPU orchestration are far from the 5 t/s target."
+}

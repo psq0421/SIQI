@@ -1,0 +1,360 @@
+{
+    "schema":  1,
+    "scope":  "Non-repeated repository code and documentation; input/quality tests are separate",
+    "license":  "MIT (SIQI source), referenced upstream material retains its own license",
+    "corpusSha256":  "809a7a1d22257f35a037826d8a1e059e682e64b58e4addba046e37e38883899f",
+    "sources":  [
+                    {
+                        "sha256":  "706887e5c0b5241e45ee1870c2ea12fce04f83cbd833f3e3d9f16f9b64344f39",
+                        "path":  "README.md"
+                    },
+                    {
+                        "sha256":  "d57a083a5e40ebf7d925a6b5e5226dd97f591775a692d84ce2cdd529b02cb8c2",
+                        "path":  "README_EN.md"
+                    },
+                    {
+                        "sha256":  "adea475e4af3c4afbbe51dcde51ae92ced3a1ac6dfd8465b0522c4a21219a9a4",
+                        "path":  "docs\\verification-beta4.md"
+                    },
+                    {
+                        "sha256":  "81257129a8464f13bb495b5b18edf21b8e7502a77690406f75e0c8871bcb9ab2",
+                        "path":  "docs\\research-beta4.md"
+                    },
+                    {
+                        "sha256":  "7d7f172003ac2b31c4eda9c2e36092229703d1ada2b4ecb0bef4495d1c3ebde7",
+                        "path":  "lib\\main.dart"
+                    },
+                    {
+                        "sha256":  "ffb3940c3f1f7b6f155a099fc41040a64670483a7749b962b69e945cc6af99b9",
+                        "path":  "lib\\app.dart"
+                    },
+                    {
+                        "sha256":  "8b099783c7aa6152d404f1b44aed486cc2bde35ff8530153e10c9a726767ddb1",
+                        "path":  "lib\\ui\\chat\\input_field.dart"
+                    },
+                    {
+                        "sha256":  "d9b27545433af5d0288499693303e0a322e79e61603474466bd23cb7c851b8a7",
+                        "path":  "lib\\shared\\page_top_bar.dart"
+                    },
+                    {
+                        "sha256":  "e66447bcc0e0316c84608d45dcb57f5a34a18fb9e4e4ac3f33ffba4fa47db6ce",
+                        "path":  "lib\\shared\\adaptive_top_bar.dart"
+                    },
+                    {
+                        "sha256":  "c91fa85f52173ad88fb45b6ee60195eb60e2e6de80fab64f4eaa2fe4a87924d8",
+                        "path":  "lib\\l10n\\l10n.dart"
+                    },
+                    {
+                        "sha256":  "1bc5bfdf946c9bd660ff615bb347967b3829a3c3c144059c1483d0f0b6915bc5",
+                        "path":  "lib\\core\\icons\\siqi_icons.dart"
+                    },
+                    {
+                        "sha256":  "ce08d442bdff4a03ea8c22400be1ae7b18ebbf44987b07dc6994daa4070a181a",
+                        "path":  "lib\\core\\theme\\siqi_design.dart"
+                    },
+                    {
+                        "sha256":  "aa637961a65d184cad29812141c15dfb184743c74b6083ad8ee614e1087f9e39",
+                        "path":  "lib\\core\\theme\\app_theme.dart"
+                    },
+                    {
+                        "sha256":  "65fc378c9d5926f65e372a34f0bdaff3d3a98fbbb97bcb2d9ad213a90c95d84c",
+                        "path":  "docs\\benchmarks\\beta3-performance.md"
+                    },
+                    {
+                        "sha256":  "13c8fa6612a76de31e50fe0920b676cda4b3b5093b5bb07f9e8080f8a90b681b",
+                        "path":  "lib\\core\\database\\local_database.dart"
+                    },
+                    {
+                        "sha256":  "6e79ad7dd245094ca477a7ebc06f856cfe60815e0b79d0366e457fdb992cefc1",
+                        "path":  "lib\\features\\startup\\startup_failure_app.dart"
+                    },
+                    {
+                        "sha256":  "6f438ea5212044598d89602d6477975121dbc6f29234a8918607b8df76da2eb3",
+                        "path":  "lib\\core\\providers\\app_providers.dart"
+                    },
+                    {
+                        "sha256":  "361bd27f14ff0deae5b8bf513d48bb1f2dd5d0c3bb11030ac0c56318b50cffba",
+                        "path":  "lib\\core\\constants\\minicpm_catalog.dart"
+                    },
+                    {
+                        "sha256":  "30d5008f27c2ab21466c36d620458b86e85c50e96ed51e4029aa619caafc86b6",
+                        "path":  "lib\\core\\constants\\app_constants.dart"
+                    },
+                    {
+                        "sha256":  "70755611eb5069d50534d3d407d811213df8fe96f530ac9e93aa1158e953b1b9",
+                        "path":  "docs\\benchmarks\\native\\README.md"
+                    },
+                    {
+                        "sha256":  "4dc9f133590c80e9880a5c8efa412b9f71f36eeb168376d80118d6fc54e9c74a",
+                        "path":  "lib\\core\\controllers\\shell_queue_controller.dart"
+                    },
+                    {
+                        "sha256":  "b70ce224c69a391c7ac1da2101441e02925cdba89c73f9b93f9cbb88690999c6",
+                        "path":  "lib\\core\\controllers\\settings_controller.dart"
+                    },
+                    {
+                        "sha256":  "4af62e478e2c2d7c394d514db9e30693464f90f0bd439a8940d9779d79d4b9cd",
+                        "path":  "lib\\core\\controllers\\download_controller.dart"
+                    },
+                    {
+                        "sha256":  "8a6b3eca3d8c10d7c817bd97d9b12d3dc9ec905aa60253de0deb0cf640b0d91c",
+                        "path":  "lib\\core\\controllers\\chat_controller.dart"
+                    },
+                    {
+                        "sha256":  "34a4a7fc569b46a79420935598c4e9b71a944c8c299036636a16ed1a0b22dcc5",
+                        "path":  "lib\\features\\chat\\model_sheet.dart"
+                    },
+                    {
+                        "sha256":  "4ecc195eaab03408686180ac46e7af12bc435fefee008f2c1b03c8c103ff0e14",
+                        "path":  "lib\\features\\chat\\chat_page.dart"
+                    },
+                    {
+                        "sha256":  "f493ac2f4b219f6fa0109e79012a7dd1a46292ff4450da1182a05f8f25cf4f44",
+                        "path":  "lib\\core\\services\\ai_team_service.dart"
+                    },
+                    {
+                        "sha256":  "190dcc3596871c6a09e1e219232dcbfcb932ae102ade189b32387982c7d2f636",
+                        "path":  "lib\\core\\services\\agent_service.dart"
+                    },
+                    {
+                        "sha256":  "7461dcd7d67a1309a1fa77607592247233ea39e7047ebe87651f8b5636edb996",
+                        "path":  "lib\\core\\services\\api_service.dart"
+                    },
+                    {
+                        "sha256":  "fb6da4735c4f68c828f122a5180d3736c7e04cd933151a3929eb90f650d8f0e6",
+                        "path":  "lib\\features\\onboarding\\onboarding_page.dart"
+                    },
+                    {
+                        "sha256":  "c35803aee9d5579e3b7a10d6952d298d01fa124e3e548479068054a22a61bad7",
+                        "path":  "lib\\features\\shell\\home_shell.dart"
+                    },
+                    {
+                        "sha256":  "87683f531f80c16ed131ff2c7d4da8d28dde6da7c471b6927b5531c834f6a8ed",
+                        "path":  "lib\\core\\services\\app_log_service.dart"
+                    },
+                    {
+                        "sha256":  "9c3374b45045fbb2a83c0e5e6cb999b2e8a79bcf09300ccc6b421da312277235",
+                        "path":  "lib\\core\\services\\workspace_service.dart"
+                    },
+                    {
+                        "sha256":  "717784f86c337f959569b47f11aa198c748147be50ddb910c1017b3007597183",
+                        "path":  "lib\\core\\services\\tts_service.dart"
+                    },
+                    {
+                        "sha256":  "daf3e1f3b4d313aacc19412281fcf132e5a053479de14973ee1ff76aa60d9a56",
+                        "path":  "lib\\core\\services\\trace_redactor.dart"
+                    },
+                    {
+                        "sha256":  "ca9e039bc8dd2272863a712075fcffb4a6a1aad6d0867a604d0d8e0a018dbe34",
+                        "path":  "lib\\features\\lab\\team_page.dart"
+                    },
+                    {
+                        "sha256":  "dc9bbb52d4e50a6c50850e79f5e179a10f56d2c9ba161fa508c82ea791224e52",
+                        "path":  "lib\\core\\services\\shell_service.dart"
+                    },
+                    {
+                        "sha256":  "b5dd304854583bc355ead7f805f6de35694573365c2a254026a683a210fe1346",
+                        "path":  "lib\\features\\lab\\shell_page.dart"
+                    },
+                    {
+                        "sha256":  "d5c5fce79c3f394ed32220d204c073de26930764ac38b42b3506e2b13b44f321",
+                        "path":  "lib\\core\\services\\secure_key_service.dart"
+                    },
+                    {
+                        "sha256":  "2f6b92df1893baf54747ca7592519847314a152a6447106c4baa589fe90db32a",
+                        "path":  "lib\\features\\lab\\multimodal_page.dart"
+                    },
+                    {
+                        "sha256":  "0333f3f2a3e1141a30df4e969c7cd91bc8db64cb302a7073a0f772996ed1405e",
+                        "path":  "lib\\core\\services\\runtime_spill_service.dart"
+                    },
+                    {
+                        "sha256":  "ac468d1e74e6756d3f0fb5a9c11ec05baa64a8a444b0f8443691354f2aba5e31",
+                        "path":  "lib\\features\\lab\\model_market_page.dart"
+                    },
+                    {
+                        "sha256":  "f3b8effe0f003fb1a9eb445b030e4a624f22eb160b6c2394da4a0893f0e87469",
+                        "path":  "lib\\features\\lab\\mcp_store_page.dart"
+                    },
+                    {
+                        "sha256":  "6e0208dcf00ed215148b374fbf91dc466cb48b325fe86ca1b90c2f1803f5eb91",
+                        "path":  "lib\\core\\services\\resource_planner.dart"
+                    },
+                    {
+                        "sha256":  "cb37dfc0b4165de4a6b6b225cf55ce9714a51f283e05283e74e3fd5bd626e93e",
+                        "path":  "lib\\features\\lab\\mcp_page.dart"
+                    },
+                    {
+                        "sha256":  "ed3fe2464d35a0665e89aad55347a99cfc5f539d5f75a55bbb63d48acd1c6a8d",
+                        "path":  "lib\\core\\services\\preferences_service.dart"
+                    },
+                    {
+                        "sha256":  "11be377cf6a02f3f10eb812b664589852ca94325b50440be98d142bf7412b2b1",
+                        "path":  "lib\\features\\lab\\lab_page.dart"
+                    },
+                    {
+                        "sha256":  "6489633eca5a1ca15d757fd7d79aa7ca20f21b9f2a10c239082492147e28279e",
+                        "path":  "lib\\core\\services\\platform_service.dart"
+                    },
+                    {
+                        "sha256":  "e171b2f93918c6ee23a75e4da4ff6378d7140eedde5bc9302dd695166914f700",
+                        "path":  "lib\\features\\lab\\harness_plugins_page.dart"
+                    },
+                    {
+                        "sha256":  "1bef0013d85e304a9e51333c3c316a14d64949ba940b3bc5f15cf5e73a31d57a",
+                        "path":  "lib\\core\\services\\permission_service.dart"
+                    },
+                    {
+                        "sha256":  "b272d6622092439c0b52bc6f1ed3e6931f0f7a66e2b293652511a0b08e1dfabb",
+                        "path":  "lib\\features\\lab\\harness_page.dart"
+                    },
+                    {
+                        "sha256":  "93d09007a36445e54fa339c1803a3c3e690876cdfe658071be5306351fc2f178",
+                        "path":  "lib\\core\\services\\performance_benchmark_service.dart"
+                    },
+                    {
+                        "sha256":  "14e4ecc685432d4674ec1e0a7840f8c695839d3737e7b74f8ebedb474ed39538",
+                        "path":  "lib\\features\\lab\\github_import_page.dart"
+                    },
+                    {
+                        "sha256":  "52ba48756786dfbc6b160c95f661e050a7e87bce78d4fa9bd36237c2b766e279",
+                        "path":  "lib\\core\\services\\ocr_service.dart"
+                    },
+                    {
+                        "sha256":  "d25a3da87424fc13e1ab5232a9cc639394f299b821fdc7e4d5a9cde86102002b",
+                        "path":  "lib\\core\\models\\app_models.dart"
+                    },
+                    {
+                        "sha256":  "3fede7f2bc5078701eba485ec029d69d41ab62f6ca582223c844d9e083df810b",
+                        "path":  "lib\\core\\services\\notification_service.dart"
+                    },
+                    {
+                        "sha256":  "c12e98f82cc09020a08895e3a65e17fa7445fb2ae0143ce03150510803c728e1",
+                        "path":  "lib\\core\\services\\model_download_service.dart"
+                    },
+                    {
+                        "sha256":  "753f0f5fc512ae16913a9bdb1baec23f9a6a324c684e657a5e7f9e11c0e78211",
+                        "path":  "lib\\core\\services\\minicpm_les_backend.dart"
+                    },
+                    {
+                        "sha256":  "a1eedd76a4f148d88d78b84b2a5dbb129582e6bb7664b219acc3687d7fa50928",
+                        "path":  "lib\\core\\services\\github_service.dart"
+                    },
+                    {
+                        "sha256":  "b9bdda7919ba0dc780218db79c930eb4461a186fd6c4b9f99f5d8663a0a319da",
+                        "path":  "lib\\core\\services\\generation_delta_timings.dart"
+                    },
+                    {
+                        "sha256":  "9751169363d53613cca74938480d4394bebc738b36afaa6deffa9a9fa19db8c8",
+                        "path":  "lib\\core\\services\\file_content_service.dart"
+                    },
+                    {
+                        "sha256":  "94588c46c4bca657c2f8a264b1f086f6b76aa40c17cae97d02ddb74dc701c52b",
+                        "path":  "lib\\core\\services\\memory_acceptance_report.dart"
+                    },
+                    {
+                        "sha256":  "e7ce7a7347c93b9de01d524eba0eb10b1372f412432d2869f0e6145c1303017d",
+                        "path":  "lib\\core\\services\\external_model_service.dart"
+                    },
+                    {
+                        "sha256":  "ed5cc9e336d2f287b2966c0cedacd3eaef16c3377a1acf9cfd66a2f482447a6d",
+                        "path":  "lib\\core\\services\\deepseek_harness_service.dart"
+                    },
+                    {
+                        "sha256":  "e958e9bc5afd7171d5bf18e0d3c044653c5434ab1ab2d617ca3baffcc7dade30",
+                        "path":  "lib\\core\\services\\cache_service.dart"
+                    },
+                    {
+                        "sha256":  "b2fc15efe18ec7d23087677fdc5074785ab0c74fcb9236289e3f288a9d47bd59",
+                        "path":  "lib\\core\\services\\benchmark_journal.dart"
+                    },
+                    {
+                        "sha256":  "ef2c7b2e0c8bd7aaad947ef981db2a3fa73283a57db1a0f4a7a1e765991e2acb",
+                        "path":  "lib\\core\\services\\asr_service.dart"
+                    },
+                    {
+                        "sha256":  "248168b82df59092a2fe3fab682ddd4e4c81bf3820614236fe8643c3d7b97952",
+                        "path":  "lib\\core\\services\\archive_service.dart"
+                    },
+                    {
+                        "sha256":  "86226155b09b156874cee721a037b6f975f801a73f0b15ca5f2466f8f89bd111",
+                        "path":  "lib\\core\\models\\privacy_models.dart"
+                    },
+                    {
+                        "sha256":  "53e18da998bd5f9b4ae1c4528c81002c1fb784df414087085a6a8ca1edf380fa",
+                        "path":  "lib\\core\\services\\mcp_service.dart"
+                    },
+                    {
+                        "sha256":  "07a559be7523a94ca10ff3d2186ee7e67568210d23597c3b8fab9eabe5b8368f",
+                        "path":  "lib\\core\\services\\local_gateway_service.dart"
+                    },
+                    {
+                        "sha256":  "61b67543a19105143a524b9a780c97b6d63be91aaed34f1a8bc74a3dc9f4bda0",
+                        "path":  "lib\\core\\services\\inference_health_policy.dart"
+                    },
+                    {
+                        "sha256":  "79e711f595ebac85b258ab3d435b24d3b79ee3d6a17af0177a4e3d1ca67cd645",
+                        "path":  "lib\\core\\services\\harness_service.dart"
+                    },
+                    {
+                        "sha256":  "1fdc4a28f59e18e0ff22adaf870eaab39db37d005b65e84857e17038d37132f6",
+                        "path":  "lib\\core\\services\\local_inference_service.dart"
+                    },
+                    {
+                        "sha256":  "bee8b1a298105d9802e1a04361bb56fc4b755238bcddc1bc0662e19fb9937966",
+                        "path":  "lib\\core\\services\\local_task_service.dart"
+                    },
+                    {
+                        "sha256":  "db194bf473f4a18ddde73b354788d6b74f0c72187feb77ad7651470034aa25ba",
+                        "path":  "lib\\core\\models\\workbench_models.dart"
+                    },
+                    {
+                        "sha256":  "9ef9c2990512f4bc6a677283592a550834e3ef85ac3dac5f2b61a7f85e988a8e",
+                        "path":  "lib\\features\\settings\\shell_settings_page.dart"
+                    },
+                    {
+                        "sha256":  "1186a73482b2c8c347bac1719dd4dc45aa4553572fae61ccd8e1223b15c9daee",
+                        "path":  "lib\\features\\settings\\settings_page.dart"
+                    },
+                    {
+                        "sha256":  "b01353db3ab3116dea626d6d0da5d70eb51bec7f85f192eb1cc52e42f68b326e",
+                        "path":  "lib\\features\\settings\\permission_privacy_page.dart"
+                    },
+                    {
+                        "sha256":  "9f123e8037c5fc09841162b345e38272306cbe742c89da3c0aeb57237cbdb446",
+                        "path":  "lib\\features\\settings\\performance_lab_page.dart"
+                    },
+                    {
+                        "sha256":  "623b4e938b34f788036e739f1657b787114b00ecff767e668bc016206dad4879",
+                        "path":  "lib\\features\\settings\\lan_gateway_page.dart"
+                    },
+                    {
+                        "sha256":  "168c2709e59d80d8282bbda945bc9574ed93a15b7e06038f5cfedc64022f39ec",
+                        "path":  "lib\\features\\settings\\diagnostics_page.dart"
+                    },
+                    {
+                        "sha256":  "356cede6e6c0726c58d413177f5a7a64cc1a092bb04e1d486f63f4b7e24f7c95",
+                        "path":  "lib\\features\\settings\\data_storage_settings_page.dart"
+                    },
+                    {
+                        "sha256":  "d160086d4a88c5306bc788f8a1ddabc75e2b6ba0d627ce93f36dddac66e1609c",
+                        "path":  "lib\\features\\settings\\cpu_performance_page.dart"
+                    },
+                    {
+                        "sha256":  "c6e1fddac8848cc5d983100e194f655f7e776f58dd498032ec9f37f3a7886225",
+                        "path":  "lib\\features\\settings\\conversation_settings_page.dart"
+                    },
+                    {
+                        "sha256":  "03455d0969bf7c984655aac89e3d2b63387ecd214cbef731a4dc8a6e2ec0dfa1",
+                        "path":  "lib\\features\\settings\\appearance_settings_page.dart"
+                    },
+                    {
+                        "sha256":  "836b1d9622bb9de67fc080ec7bb6dd27fa605d38d98ce2521c2c41853f3b8487",
+                        "path":  "lib\\features\\settings\\api_config_page.dart"
+                    },
+                    {
+                        "sha256":  "08880acd71b54997d1e818fb8f3729837c25efa2e201b97422ffcac838cd989a",
+                        "path":  "lib\\features\\settings\\about_page.dart"
+                    }
+                ]
+}

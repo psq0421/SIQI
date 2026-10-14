@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/app_providers.dart';
@@ -51,7 +53,9 @@ class _CpuPerformancePageState extends ConsumerState<CpuPerformancePage> {
         .read(platformServiceProvider)
         .setCpuAffinity(_selected.toList()..sort());
     if (ok) {
-      await ref.read(settingsProvider.notifier).update(
+      await ref
+          .read(settingsProvider.notifier)
+          .update(
             (current) => current.copyWith(
               selectedCpuCores: (_selected.toList()..sort()),
             ),
@@ -79,7 +83,7 @@ class _CpuPerformancePageState extends ConsumerState<CpuPerformancePage> {
     final l = context.l10n;
     final runtime = _runtime;
     return Scaffold(
-      appBar: AppBar(title: Text(l.cpuPerformance)),
+      appBar: SiqiPageBar(title: Text(l.cpuPerformance)),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
@@ -120,11 +124,13 @@ class _CpuPerformancePageState extends ConsumerState<CpuPerformancePage> {
                               _selected.remove(id);
                             }
                             final selected = _selected.toList()..sort();
-                            ref.read(settingsProvider.notifier).update(
-                              (current) => current.copyWith(
-                                selectedCpuCores: selected,
-                              ),
-                            );
+                            ref
+                                .read(settingsProvider.notifier)
+                                .update(
+                                  (current) => current.copyWith(
+                                    selectedCpuCores: selected,
+                                  ),
+                                );
                           }),
                     title: Text(
                       '${l.cpuCore} ${(core['id'] as num).toInt()} · ${core['architecture']}',

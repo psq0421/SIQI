@@ -17,9 +17,75 @@ abstract final class AppTheme {
       contrastLevel: 0,
     );
     final colors = seeded.copyWith(
-      surface: dark ? const Color(0xFF111318) : const Color(0xFFF9F9FC),
-      surfaceContainerLowest: dark ? const Color(0xFF0C0E13) : Colors.white,
+      primary: dark ? const Color(0xFFF3F4F6) : const Color(0xFF17191E),
+      onPrimary: dark ? const Color(0xFF17191E) : Colors.white,
+      primaryContainer: dark
+          ? const Color(0xFF2A2D34)
+          : const Color(0xFFE6E8ED),
+      onPrimaryContainer: dark ? Colors.white : const Color(0xFF17191E),
+      secondary: dark ? const Color(0xFFCED1D8) : const Color(0xFF4C5059),
+      onSecondary: dark ? const Color(0xFF17191E) : Colors.white,
+      secondaryContainer: dark
+          ? const Color(0xFF24272E)
+          : const Color(0xFFEDF0F4),
+      onSecondaryContainer: dark ? Colors.white : const Color(0xFF17191E),
+      tertiary: dark ? const Color(0xFFD9DCE2) : const Color(0xFF50545D),
+      tertiaryContainer: dark
+          ? const Color(0xFF24272E)
+          : const Color(0xFFEDF0F4),
+      onTertiaryContainer: dark ? Colors.white : const Color(0xFF17191E),
+      outline: dark ? const Color(0xFF727781) : const Color(0xFF858A94),
+      outlineVariant: dark ? const Color(0xFF30343C) : const Color(0xFFDEE1E6),
+      surfaceTint: Colors.transparent,
+      onSurface: dark ? const Color(0xFFF1F2F4) : const Color(0xFF191B20),
+      onSurfaceVariant: dark
+          ? const Color(0xFFBBC0C9)
+          : const Color(0xFF555B66),
+      surface: dark ? const Color(0xFF08090C) : const Color(0xFFF7F8FA),
+      surfaceContainerLowest: dark ? const Color(0xFF101216) : Colors.white,
+      surfaceContainer: dark
+          ? const Color(0xFF17191E)
+          : const Color(0xFFF0F2F5),
+      surfaceContainerLow: dark
+          ? const Color(0xFF14161B)
+          : const Color(0xFFF4F5F7),
+      surfaceContainerHigh: dark
+          ? const Color(0xFF1C1F25)
+          : const Color(0xFFEDEFF3),
+      surfaceContainerHighest: dark
+          ? const Color(0xFF202329)
+          : const Color(0xFFE9ECF0),
     );
+    final textTheme =
+        (dark
+                ? Typography.material2021(
+                    platform: TargetPlatform.android,
+                  ).white
+                : Typography.material2021(
+                    platform: TargetPlatform.android,
+                  ).black)
+            .copyWith(
+              titleLarge: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
+              ),
+              titleMedium: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              titleSmall: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            )
+            .apply(
+              bodyColor: dark
+                  ? const Color(0xFFF1F2F4)
+                  : const Color(0xFF191B20),
+              displayColor: dark
+                  ? const Color(0xFFF1F2F4)
+                  : const Color(0xFF191B20),
+            );
     final shape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(SiqiRadius.surface),
     );
@@ -29,13 +95,27 @@ abstract final class AppTheme {
       colorScheme: colors,
       scaffoldBackgroundColor: colors.surface,
       canvasColor: colors.surface,
+      textTheme: textTheme,
       appBarTheme: AppBarTheme(
         elevation: 0,
-        scrolledUnderElevation: 3,
+        scrolledUnderElevation: 0,
         centerTitle: false,
         backgroundColor: colors.surface,
         foregroundColor: colors.onSurface,
         surfaceTintColor: colors.surfaceTint,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(SiqiRadius.surface),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          backgroundColor: colors.surfaceContainerHighest,
+          foregroundColor: colors.onSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(SiqiRadius.surface),
+          ),
+          minimumSize: const Size(48, 48),
+        ),
       ),
       navigationBarTheme: NavigationBarThemeData(
         height: 68,
@@ -94,7 +174,7 @@ abstract final class AppTheme {
         ),
       ),
       listTileTheme: const ListTileThemeData(
-        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       ),
       chipTheme: ChipThemeData(
         backgroundColor: colors.surfaceContainer,

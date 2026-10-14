@@ -12,7 +12,9 @@ abstract final class SiqiSpacing {
 }
 
 abstract final class SiqiRadius {
-  static const surface = 12.0;
+  /// One visual language for cards, fields and top controls. The generous
+  /// radius keeps the light/dark themes calm without changing the brand mark.
+  static const surface = 20.0;
   static const pill = 999.0;
 }
 
@@ -73,7 +75,7 @@ class SiqiSectionHeader extends StatelessWidget {
               title,
               style: Theme.of(
                 context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 3),
@@ -174,7 +176,7 @@ class SiqiMetricCard extends StatelessWidget {
                   value,
                   style: Theme.of(
                     context,
-                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
                 if (caption != null)
                   Text(
@@ -221,7 +223,7 @@ class SiqiEmptyState extends StatelessWidget {
               textAlign: TextAlign.center,
               style: Theme.of(
                 context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 7),
             Text(
@@ -277,7 +279,7 @@ class SiqiActionTile extends StatelessWidget {
                         child: Text(
                           title,
                           style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                       ),
                       if (badge != null) badge!,

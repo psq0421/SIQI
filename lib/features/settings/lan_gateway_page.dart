@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/app_providers.dart';
 import '../../l10n/l10n.dart';
@@ -63,7 +65,7 @@ class _LanGatewayPageState extends ConsumerState<LanGatewayPage> {
     final service = ref.watch(localGatewayServiceProvider);
     final l = context.l10n;
     return Scaffold(
-      appBar: AppBar(title: Text(l.lanGateway)),
+      appBar: SiqiPageBar(title: Text(l.lanGateway)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [

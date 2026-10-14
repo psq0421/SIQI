@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -152,7 +154,7 @@ class _DataStorageSettingsPageState
     final settings = ref.watch(settingsProvider);
     final update = ref.read(settingsProvider.notifier).update;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.dataStorage)),
+      appBar: SiqiPageBar(title: Text(context.l10n.dataStorage)),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [

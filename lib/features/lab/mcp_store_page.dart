@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -68,7 +70,7 @@ class _McpStorePageState extends ConsumerState<McpStorePage> {
   Widget build(BuildContext context) {
     final catalog = ref.watch(mcpCatalogProvider(_query));
     return Scaffold(
-      appBar: AppBar(
+      appBar: SiqiPageBar(
         title: Text(context.l10n.mcpStore),
         actions: [
           IconButton(

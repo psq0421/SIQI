@@ -1,0 +1,57 @@
+{
+  "capturedAt": "2026-10-14T12:11:13.1705205+08:00",
+  "apkSha256": "E43E77A851C2D0373D3447B6362654126888447071E53E386C4C98736AD6DE9B",
+  "record": {
+    "schema": 2,
+    "event": "completed",
+    "runId": "1791950426156608",
+    "at": "2026-10-14T12:00:26.156608",
+    "modelId": "local-minicpmv47-35b-mixq3",
+    "promptId": "selected-document-v1",
+    "promptSha256": "fdf4b0dd47aab331699e5e20c30f634ab3be49d2a7a47eb00f8885c4dba9d1d6",
+    "reuseModelRequested": false,
+    "profile": "LES / CPU 4 / Q4 KV / experts56 / micro8",
+    "runtimeProfile": "minicpm-v47-35b-les",
+    "quantization": "mix_q3gud_im",
+    "modelSha256": "51e32201f0ddaf87dbb9689ceef9e3aa1a1543a1366706aa2abbf3aabb34df6b",
+    "device": {
+      "socModel": "SM8475",
+      "androidSdk": 37,
+      "processorCount": 8,
+      "ramBytes": 11706544128,
+      "swapTotalBytes": 12884897792,
+      "swapFreeBytes": 6836391936
+    },
+    "requestedContext": 8192,
+    "requestedOutput": 256,
+    "performance": {
+      "modelId": "local-minicpmv47-35b-mixq3",
+      "requestedContext": 8192,
+      "effectiveContext": null,
+      "runtimeProfile": "minicpm-v47-35b-les",
+      "memoryBudgetBytes": 5000000000,
+      "status": "cancelled",
+      "failureStage": "request",
+      "terminationReason": "LocalInferenceCancelledException",
+      "requestStartedAt": "2026-10-14T04:00:26.810014Z",
+      "sampledPeakRssBytes": 2142244864,
+      "rssSamples": 300
+    },
+    "error": "TimeoutException: benchmark-timeout",
+    "memoryAcceptance": {
+      "schemaVersion": 1,
+      "scope": "sampled-whole-app-process-peak-for-this-run",
+      "targetBytes": 5000000000,
+      "peakRssBytes": 1782112256,
+      "peakPssBytes": 1839890432,
+      "rssSamples": 122,
+      "pssSamples": 122,
+      "completed": false,
+      "requestedContext": 8192,
+      "effectiveContext": null,
+      "contextTargetMet": false,
+      "verdict": "inconclusive",
+      "limitation": "Sampling can miss transient peaks. A passing run does not validate other contexts, image inputs, or long conversations."
+    }
+  }
+}

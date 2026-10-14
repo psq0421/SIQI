@@ -14,6 +14,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.StatFs
+import android.view.WindowManager
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
@@ -42,6 +43,12 @@ class MainActivity : FlutterActivity() {
             PLATFORM_CHANNEL
         ).setMethodCallHandler { call, result ->
             when (call.method) {
+                "setKeepScreenOn" -> {
+                    val enabled = call.argument<Boolean>("enabled") ?: true
+                    if (enabled) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    result.success(true)
+                }
                 "networkStatus" -> result.success(networkStatus())
                 "memoryStatus" -> result.success(memoryStatus())
                 "storageStatus" -> {

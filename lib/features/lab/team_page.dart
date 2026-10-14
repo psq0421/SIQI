@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
@@ -176,7 +178,7 @@ class _TeamPageState extends ConsumerState<TeamPage> {
         .toList(growable: false);
     final profilesById = {for (final profile in profiles) profile.id: profile};
     return Scaffold(
-      appBar: AppBar(
+      appBar: SiqiPageBar(
         title: Text(context.l10n.aiTeamMode),
         actions: [
           IconButton(

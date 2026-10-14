@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -15,7 +17,7 @@ class PermissionPrivacyPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final audit = ref.watch(permissionAuditProvider);
     return Scaffold(
-      appBar: AppBar(
+      appBar: SiqiPageBar(
         title: Text(context.l10n.permissionPrivacy),
         actions: [
           TextButton(

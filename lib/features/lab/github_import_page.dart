@@ -1,5 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -164,7 +166,7 @@ class _GithubImportPageState extends ConsumerState<GithubImportPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: Text(context.l10n.githubImport)),
+    appBar: SiqiPageBar(title: Text(context.l10n.githubImport)),
     body: ListView(
       padding: const EdgeInsets.all(16),
       children: [

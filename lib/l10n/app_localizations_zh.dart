@@ -9,6 +9,64 @@ class AppLocalizationsZh extends AppLocalizations {
   AppLocalizationsZh([String locale = 'zh']) : super(locale);
 
   @override
+  String get lesExpertCache => 'LES 专家缓存（清除不会删除原始模型）';
+
+  @override
+  String get lesTextOnly => 'LES 文本运行时；视觉组件尚未启用';
+
+  @override
+  String get lesPreparationNotice =>
+      '首次运行将自动重排并校验专家，需要额外约一份模型大小的本地存储；原始模型不会修改。';
+
+  @override
+  String get modelRuntimePending => '可下载管理；专用运行时适配中';
+
+  @override
+  String get keepScreenAwake => '前台保持屏幕常亮';
+
+  @override
+  String get keepScreenAwakeDescription => '默认开启。切到后台后遵循系统息屏设置；开启可能增加耗电。';
+
+  @override
+  String get agentTraces => 'Agent 执行轨迹';
+
+  @override
+  String get agentTraceDescription => '本地记录步骤、结果与终止原因，导出 JSON 用于复现和评测。';
+
+  @override
+  String get exportAgentTrace => '导出 Agent 轨迹';
+
+  @override
+  String get exportFailedAgentTrace => '导出失败日志';
+
+  @override
+  String get tracePrivacyWarning => '日志可能包含你的指令、代码与工具输出。常见密钥已脱敏，但分享前仍请检查内容。';
+
+  @override
+  String get traceDelete => '删除此轨迹';
+
+  @override
+  String get traceEmpty => '暂无 Agent 执行轨迹';
+
+  @override
+  String get traceInterrupted => '应用重启导致中断';
+
+  @override
+  String get traceExportFailed => '无法导出轨迹，请重试。';
+
+  @override
+  String get releaseActiveModel => '释放正在运行的模型';
+
+  @override
+  String get releaseActiveModelDescription => '停止生成并释放原生模型内存。';
+
+  @override
+  String get modelMemoryReleased => '模型内存已释放';
+
+  @override
+  String get runtimeSpillCache => '推理临时缓存';
+
+  @override
   String get lanGateway => '局域网网关';
 
   @override
@@ -58,6 +116,22 @@ class AppLocalizationsZh extends AppLocalizations {
   String get benchmarkTitle => '性能实验';
 
   @override
+  String get benchmarkContextNote =>
+      '窗口大小只是申请容量。请选择真实文档并查看实际输入 token 数；短提示词不能验证长上下文。日志不保存文档正文。';
+
+  @override
+  String get benchmarkReuseModel => '保留已加载模型进行热测试';
+
+  @override
+  String get benchmarkReuseModelNote => '关闭时先释放模型再加载；文件缓存不由应用清空。实际复用情况写入结果。';
+
+  @override
+  String get benchmarkPickDocument => '选择真实文档测试长输入';
+
+  @override
+  String get benchmarkResetDocument => '恢复内置短文本测试';
+
+  @override
   String get benchmarkWarning => '实验会加载大模型并消耗电量；保持通风，系统过热时终止。结果不代表已达到 5 t/s。';
 
   @override
@@ -83,6 +157,19 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get benchmarkRunning => '正在运行受控实验…';
+
+  @override
+  String benchmarkPrefillProgress(int evaluated, int total) {
+    return '正在处理真实输入：$evaluated / $total tokens。预填充完成后才开始测量解码速度。';
+  }
+
+  @override
+  String benchmarkThreadSweepProgress(int completed, int total) {
+    return '同一输入状态线程对比：$completed / $total。结果包含全部配置，不自动选取最高成绩。';
+  }
+
+  @override
+  String get benchmarkBusy => '已有推理或性能实验在运行，请等待结束后重试。';
 
   @override
   String get benchmarkDescription => '真机基准、内存压力与推理性能记录';
@@ -1911,6 +1998,64 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   AppLocalizationsZhTw() : super('zh_TW');
 
   @override
+  String get lesExpertCache => 'LES 專家快取（清除不會刪除原始模型）';
+
+  @override
+  String get lesTextOnly => 'LES 文字執行環境；視覺元件尚未啟用';
+
+  @override
+  String get lesPreparationNotice =>
+      '首次執行將自動重排並校驗專家，需額外約一份模型大小的本機儲存空間；原始模型不會修改。';
+
+  @override
+  String get modelRuntimePending => '可下載管理；專用執行環境適配中';
+
+  @override
+  String get keepScreenAwake => '前景保持螢幕常亮';
+
+  @override
+  String get keepScreenAwakeDescription => '預設開啟。切到背景後遵循系統關閉螢幕設定；開啟可能增加耗電。';
+
+  @override
+  String get agentTraces => 'Agent 執行軌跡';
+
+  @override
+  String get agentTraceDescription => '本機記錄步驟、結果與終止原因，匯出 JSON 用於重現及評測。';
+
+  @override
+  String get exportAgentTrace => '匯出 Agent 軌跡';
+
+  @override
+  String get exportFailedAgentTrace => '匯出失敗日誌';
+
+  @override
+  String get tracePrivacyWarning => '日誌可能包含你的指令、程式碼與工具輸出。常見金鑰已遮罩，分享前仍請檢查內容。';
+
+  @override
+  String get traceDelete => '刪除此軌跡';
+
+  @override
+  String get traceEmpty => '尚無 Agent 執行軌跡';
+
+  @override
+  String get traceInterrupted => '應用程式重啟導致中斷';
+
+  @override
+  String get traceExportFailed => '無法匯出軌跡，請重試。';
+
+  @override
+  String get releaseActiveModel => '釋放正在執行的模型';
+
+  @override
+  String get releaseActiveModelDescription => '停止生成並釋放原生模型記憶體。';
+
+  @override
+  String get modelMemoryReleased => '模型記憶體已釋放';
+
+  @override
+  String get runtimeSpillCache => '推理暫存';
+
+  @override
   String get lanGateway => '區域網路閘道';
 
   @override
@@ -1960,6 +2105,22 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
   String get benchmarkTitle => '性能实验';
 
   @override
+  String get benchmarkContextNote =>
+      '視窗大小只是申請容量。請選擇真實文件並查看實際輸入 token 數；短提示詞不能驗證長上下文。日誌不儲存文件正文。';
+
+  @override
+  String get benchmarkReuseModel => '保留已載入模型進行熱測試';
+
+  @override
+  String get benchmarkReuseModelNote => '關閉時先釋放模型再載入；應用程式不會清空檔案快取。實際重用情況寫入結果。';
+
+  @override
+  String get benchmarkPickDocument => '選擇真實文件測試長輸入';
+
+  @override
+  String get benchmarkResetDocument => '恢復內建短文字測試';
+
+  @override
   String get benchmarkWarning => '实验会加载大模型并消耗电量；保持通风，系统过热时终止。结果不代表已达到 5 t/s。';
 
   @override
@@ -1985,6 +2146,19 @@ class AppLocalizationsZhTw extends AppLocalizationsZh {
 
   @override
   String get benchmarkRunning => '正在运行受控实验…';
+
+  @override
+  String benchmarkPrefillProgress(int evaluated, int total) {
+    return '正在處理真實輸入：$evaluated / $total tokens。預填充完成後才開始測量解碼速度。';
+  }
+
+  @override
+  String benchmarkThreadSweepProgress(int completed, int total) {
+    return '同一輸入狀態執行緒比較：$completed / $total。結果包含全部設定，不自動選取最高成績。';
+  }
+
+  @override
+  String get benchmarkBusy => '已有推理或效能實驗正在執行，請待結束後重試。';
 
   @override
   String get benchmarkDescription => '真机基准、内存压力与推理性能记录';

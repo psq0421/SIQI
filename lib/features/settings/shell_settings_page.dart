@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+
+import '../../shared/page_top_bar.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/app_models.dart';
 import '../../core/providers/app_providers.dart';
 import '../../l10n/l10n.dart';
+import '../lab/shell_page.dart';
 
 class ShellSettingsPage extends ConsumerWidget {
   const ShellSettingsPage({super.key});
@@ -13,7 +16,7 @@ class ShellSettingsPage extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final update = ref.read(settingsProvider.notifier).update;
     return Scaffold(
-      appBar: AppBar(title: Text(context.l10n.shellSettings)),
+      appBar: SiqiPageBar(title: Text(context.l10n.shellSettings)),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
@@ -87,6 +90,16 @@ class ShellSettingsPage extends ConsumerWidget {
               ),
               title: Text(context.l10n.dangerousConfirmation),
             ),
+          ),
+          const SizedBox(height: 14),
+          // Keep the terminal inside the shell settings flow, while still
+          // requiring Developer mode in ShellPage before a command can run.
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(builder: (_) => const ShellPage()),
+            ),
+            icon: const Icon(Icons.terminal),
+            label: Text(context.l10n.shellTitle),
           ),
         ],
       ),
