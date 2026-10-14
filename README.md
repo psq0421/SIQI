@@ -11,7 +11,7 @@
 
 ## Beta.4：从能运行，到可追溯
 
-本次 Beta 为 **1.0.0-beta.4 · build 4300**：保留原有标识，重做黑白极简界面；前台默认保持亮屏；Agent 从模型请求开始记录完整任务轨迹；基准测试留下可导出的原始 JSONL。端侧优化主线转向 **MiniCPM，优先 MiniCPM‑V 4.7 35B‑A3B**。
+本次 Beta 为 **1.0.0-beta.4 · build 4300**：保留原有标识，重绘界面；前台默认保持亮屏；Agent 从模型请求开始记录完整任务轨迹；基准测试留下可导出的原始 JSONL。端侧优化主线转向 **MiniCPM**。
 
 [下载 Beta.4](https://github.com/psq0421/SIQI/releases/tag/v1.0.0.Beta.4) · [详细双语更新日志](CHANGELOG_BETA4.md) · [研究接口与验收协议](docs/research-beta4.md)。这是预发布版本：专用 35B 路径目前仅支持文本，长上下文和全模态仍未完成验收。
 
